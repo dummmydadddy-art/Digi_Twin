@@ -138,7 +138,7 @@ export default function AnatomyScene({atlas,state,onSelect,onPeelChange,onProgre
    const tier=getSystemTier(system as SystemId);
    const isSkin=system==='integumentary';
    const motionType=system==='cardiac'?1.0:system==='respiratory'?2.0:system==='digestive'?3.0:0.0;
-   const m=new T.MeshStandardMaterial({color:SYSTEMS.find(s=>s.id===system)?.color??'#aebbb8',metalness:.08,roughness:.53,side:T.DoubleSide,transparent:isSkin,opacity:isSkin?.88:1,depthWrite:true});
+   const m=new T.MeshStandardMaterial({color:SYSTEMS.find(s=>s.id===system)?.color??'#aebbb8',metalness:.08,roughness:.53,side:T.DoubleSide,transparent:isSkin,opacity:isSkin?0.12:1.0,depthWrite:!isSkin});
    m.onBeforeCompile=shader=>{
     shader.uniforms.partState={value:partTexture};shader.uniforms.selectionState={value:selectionTexture};shader.uniforms.glowState={value:glowTexture};shader.uniforms.stateWidth={value:width};
     shader.uniforms.uPeel=peelUniform;shader.uniforms.uPeelCenter=peelCenterUniform;shader.uniforms.uPeelRadius=peelRadiusUniform;shader.uniforms.uTier={value:tier};
@@ -190,8 +190,8 @@ if (uPeelRadius > 0.001) {
 float tierAlpha = 1.0;
 if (partSelected < 0.5) {
  if (uTier < 0.5) {
-  if (localPeel >= 0.25) discard;
-  tierAlpha = (1.0 - smoothstep(0.0, 0.25, localPeel)) * 0.88;
+  if (localPeel >= 0.20) discard;
+  tierAlpha = 1.0 - smoothstep(0.0, 0.20, localPeel);
  } else if (uTier < 1.5) {
   if (localPeel >= 0.52) discard;
   if (localPeel > 0.18) {
@@ -257,7 +257,7 @@ if (organGlow.a > 0.005) {
     if(p.chunk!==ci)return;
     const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(new Float32Array(buffer,p.positions,p.vertexCount*3),3));
     g.setAttribute('normal',new T.BufferAttribute(new Int16Array(buffer,p.normals,p.vertexCount*3),3,true));g.setIndex(new T.BufferAttribute(new Uint32Array(buffer,p.indices,p.indexCount),1));
-    g.boundingBox=bounds[i].clone();g.computeBoundingSphere();const pick=new T.Mesh(g);pick.matrixAutoUpdate=false;pickers[i]=pick;geometries.push(g);anatomyGroup.add(pick);
+    g.boundingBox=bounds[i].clone();g.computeBoundingSphere();const pick=new T.Mesh(g);pick.matrixAutoUpdate=false;pick.visible=false;pickers[i]=pick;geometries.push(g);
     g.setAttribute('partIndex',new T.BufferAttribute(new Float32Array(p.vertexCount).fill(i),1));
     const list=groups.get(p.system)??[];list.push(g);groups.set(p.system,list);
    });
@@ -294,19 +294,15 @@ if (organGlow.a > 0.005) {
      dirty = true;
     }
 
-    // Stream remaining organ group chunks progressively in idle frames
-    for (const ci of remainingChunks) {
-     if (disposed) break;
-     await new Promise(r => {
-      if (typeof requestIdleCallback !== 'undefined') {
-       requestIdleCallback(() => r(null), { timeout: 150 });
-      } else {
-       setTimeout(r, 20);
-      }
-     });
-     if (disposed) break;
-     await loadChunkSafe(ci);
-    }
+    // Stream remaining organ group chunks concurrently with 3 workers
+    let cursor = 0;
+    await Promise.all(Array.from({ length: 3 }, async () => {
+     while (cursor < remainingChunks.length) {
+      if (disposed) break;
+      const ci = remainingChunks[cursor++];
+      await loadChunkSafe(ci);
+     }
+    }));
    } catch (e) {
     if (!disposed) onError(e instanceof Error ? e.message : 'Could not load the anatomy.');
    }
