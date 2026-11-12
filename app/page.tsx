@@ -32,7 +32,7 @@ export default function Home(){
  const [selectedDoseMg, setSelectedDoseMg] = useState<number>(500);
  const [simRunning, setSimRunning] = useState(false);
  const [simPaused, setSimPaused] = useState(false);
- const [simSpeed, setSimSpeed] = useState<number>(5);
+ const [simSpeed, setSimSpeed] = useState<number>(60);
  const [simTimeHours, setSimTimeHours] = useState<number>(0);
  const [simResult, setSimResult] = useState<SimulationResult | null>(null);
  const [showCitations, setShowCitations] = useState(false);
@@ -45,7 +45,7 @@ export default function Home(){
  },[]);
 
  const reset=()=>{
-  setState(s=>({...initial,cutaway:true,visible:DEFAULT_VISIBLE,patient:s.patient,simulation:{active:false,progress:0,stomachLevel:0,gutLevel:0,plasmaLevel:0,liverIntensity:0,kidneyIntensity:0},reset:s.reset+1}));
+  setState(s=>({...initial,cutaway:true,visible:DEFAULT_VISIBLE,patient:s.patient,simulation:{active:false,progress:0,stomachLevel:0,gutLevel:0,plasmaLevel:0,liverIntensity:0,kidneyIntensity:0,hepaticRateMgH:0,renalRateMgH:0,stomachMg:0,gutMg:0,plasmaMg:0},reset:s.reset+1}));
   setChosen(null);setDetails(false);setPanel(null);setPatientOpen(false);setSimRunning(false);setSimPaused(false);setSimTimeHours(0);setSimResult(null);
  };
 
@@ -142,6 +142,11 @@ export default function Home(){
     plasmaLevel: 0,
     liverIntensity: 0,
     kidneyIntensity: 0,
+    hepaticRateMgH: 0,
+    renalRateMgH: 0,
+    stomachMg: 0,
+    gutMg: 0,
+    plasmaMg: 0,
    },
   }));
  };
@@ -210,7 +215,10 @@ export default function Home(){
   const tick = (now: number) => {
    const dtSec = (now - lastTime) / 1000;
    lastTime = now;
-   const deltaSimHours = dtSec * simSpeed;
+   // Time-speed: 1x means 1 sec = 1 min (60x real-time)
+   // 60x means 1 sec = 1 hour (24 hours in 24 seconds)
+   // 600x means 1 sec = 10 hours (24 hours in 2.4 seconds)
+   const deltaSimHours = dtSec * (simSpeed / 60.0);
    setSimTimeHours(prev => {
     const next = prev + deltaSimHours;
     if (next >= 24) {
@@ -249,19 +257,34 @@ export default function Home(){
   return simResult.samples[idx];
  }, [simResult, simTimeHours]);
 
+ const weight = patient.weightKg;
+ const cp = currentSample.plasmaConcentrationMgL;
+ const mec = currentDrug.targetRangeMgL.min;
+ const toxic = currentDrug.toxicThresholdMgL;
+
+ // Instantaneous clearance rates (mg/hour) strictly driving liver and kidney glow
+ const hepaticClLh = currentDrug.clPerKg * weight * currentDrug.hepaticFraction;
+ const renalClLh = currentDrug.clPerKg * weight * currentDrug.renalFraction * (scale.crClMlMin / 100);
+ const hepaticRateMgH = cp * hepaticClLh;
+ const renalRateMgH = cp * renalClLh;
+
+ const cmaxRef = Math.max(simResult?.cmaxMgL ?? 10, currentDrug.toxicThresholdMgL * 0.7);
+ const maxHepaticRate = Math.max(0.001, cmaxRef * hepaticClLh);
+ const maxRenalRate = Math.max(0.001, cmaxRef * renalClLh);
+
+ const liverIntensity = (currentDrug.clearanceRoute === 'hepatic' || currentDrug.clearanceRoute === 'mixed')
+  ? Math.min(1.0, hepaticRateMgH / maxHepaticRate)
+  : 0;
+
+ const kidneyIntensity = (currentDrug.clearanceRoute === 'renal' || currentDrug.clearanceRoute === 'mixed')
+  ? Math.min(1.0, renalRateMgH / maxRenalRate)
+  : 0;
+
  useEffect(() => {
   if (!simRunning && !simResult) return;
   const pillProgress = Math.min(1, simTimeHours / 0.65);
   const maxRef = Math.max(simResult?.cmaxMgL ?? 10, currentDrug.toxicThresholdMgL);
   const plasmaNorm = Math.min(1, currentSample.plasmaConcentrationMgL / (maxRef * 0.75));
-
-  const liverInt = (currentDrug.clearanceRoute === 'hepatic' || currentDrug.clearanceRoute === 'mixed')
-   ? Math.min(1, (currentSample.liverMetabolizedMg / (selectedDoseMg * currentDrug.hepaticFraction + 0.001)) * (plasmaNorm > 0.05 ? 1.0 : plasmaNorm * 4))
-   : 0;
-
-  const kidneyInt = (currentDrug.clearanceRoute === 'renal' || currentDrug.clearanceRoute === 'mixed')
-   ? Math.min(1, (currentSample.kidneyExcretedMg / (selectedDoseMg * currentDrug.renalFraction + 0.001)) * (plasmaNorm > 0.05 ? 1.0 : plasmaNorm * 4))
-   : 0;
 
   setState(s => ({
    ...s,
@@ -271,15 +294,16 @@ export default function Home(){
     stomachLevel: Math.min(1, currentSample.stomachMg / (selectedDoseMg || 1)),
     gutLevel: Math.min(1, currentSample.gutMg / (selectedDoseMg || 1)),
     plasmaLevel: plasmaNorm,
-    liverIntensity: liverInt,
-    kidneyIntensity: kidneyInt,
+    liverIntensity,
+    kidneyIntensity,
+    hepaticRateMgH,
+    renalRateMgH,
+    stomachMg: currentSample.stomachMg,
+    gutMg: currentSample.gutMg,
+    plasmaMg: currentSample.plasmaMg,
    },
   }));
- }, [simTimeHours, currentSample, simRunning, simResult, selectedDoseMg, currentDrug]);
-
- const cp = currentSample.plasmaConcentrationMgL;
- const mec = currentDrug.targetRangeMgL.min;
- const toxic = currentDrug.toxicThresholdMgL;
+ }, [simTimeHours, currentSample, simRunning, simResult, selectedDoseMg, currentDrug, liverIntensity, kidneyIntensity, hepaticRateMgH, renalRateMgH]);
 
  let effectBadgeClass = 'subtherapeutic';
  let effectBadgeLabel = 'Subtherapeutic (Inactive)';
@@ -595,14 +619,27 @@ export default function Home(){
         type="button"
         className="playback-btn"
         onClick={handleResetSim}
-        title="Reset simulation"
+        title="Reset simulation (Esc)"
        >
         <RotateCcw size={14} />
+        <span>Reset</span>
        </button>
       </div>
 
+      <div className="sim-clock-badge">
+       T + {Math.floor(simTimeHours).toString().padStart(2, '0')}h {Math.round((simTimeHours % 1) * 60).toString().padStart(2, '0')}m
+      </div>
+     </div>
+
+     <div className="playback-speed-section">
+      <div className="speed-header">
+       <span className="speed-title">Time Speed: <strong>{simSpeed}×</strong></span>
+       <span className="speed-sub">
+        {simSpeed === 1 ? '1s = 1min' : simSpeed === 60 ? '1s = 1hr' : simSpeed === 600 ? '1s = 10hr' : `${(simSpeed/60).toFixed(1)}h / sec`}
+       </span>
+      </div>
       <div className="playback-speed-group">
-       {[1, 5, 20].map(sp => (
+       {[1, 10, 60, 120, 300, 600].map(sp => (
         <button
          key={sp}
          type="button"
@@ -613,9 +650,17 @@ export default function Home(){
         </button>
        ))}
       </div>
-
-      <div className="sim-clock-badge">
-       T + {Math.floor(simTimeHours).toString().padStart(2, '0')}h {Math.round((simTimeHours % 1) * 60).toString().padStart(2, '0')}m
+      <div className="speed-slider-row">
+       <input
+        type="range"
+        min="1"
+        max="600"
+        step="1"
+        value={simSpeed}
+        onChange={e => setSimSpeed(Number(e.target.value))}
+        className="speed-range-slider"
+        aria-label="Simulation speed 1x to 600x"
+       />
       </div>
      </div>
 
@@ -650,26 +695,32 @@ export default function Home(){
       <div className="compartment-card">
        <span className="comp-name">Stomach</span>
        <span className="comp-val">{currentSample.stomachMg.toFixed(1)} <small>mg</small></span>
+       <span className="comp-sub">{((currentSample.stomachMg / (selectedDoseMg || 1)) * 100).toFixed(0)}% dose</span>
       </div>
       <div className="compartment-card">
        <span className="comp-name">Intestinal Gut</span>
        <span className="comp-val">{currentSample.gutMg.toFixed(1)} <small>mg</small></span>
+       <span className="comp-sub">{((currentSample.gutMg / (selectedDoseMg || 1)) * 100).toFixed(0)}% dose</span>
       </div>
       <div className="compartment-card">
        <span className="comp-name">Plasma (Cp)</span>
        <span className="comp-val">{currentSample.plasmaConcentrationMgL.toFixed(2)} <small>mg/L</small></span>
+       <span className="comp-sub">{currentSample.plasmaMg.toFixed(1)} mg in blood</span>
       </div>
       <div className="compartment-card liver">
-       <span className="comp-name">Liver Cleared</span>
-       <span className="comp-val">{currentSample.liverMetabolizedMg.toFixed(1)} <small>mg</small></span>
+       <span className="comp-name">Liver Clearance</span>
+       <span className="comp-val">{hepaticRateMgH.toFixed(1)} <small>mg/h</small></span>
+       <span className="comp-sub">{currentSample.liverMetabolizedMg.toFixed(1)} mg cleared</span>
       </div>
       <div className="compartment-card kidney">
-       <span className="comp-name">Kidney Excreted</span>
-       <span className="comp-val">{currentSample.kidneyExcretedMg.toFixed(1)} <small>mg</small></span>
+       <span className="comp-name">Kidney Excretion</span>
+       <span className="comp-val">{renalRateMgH.toFixed(1)} <small>mg/h</small></span>
+       <span className="comp-sub">{currentSample.kidneyExcretedMg.toFixed(1)} mg cleared</span>
       </div>
       <div className="compartment-card">
        <span className="comp-name">Elimination Route</span>
        <span className="comp-val" style={{ textTransform: 'capitalize', fontSize: '11px' }}>{currentDrug.clearanceRoute}</span>
+       <span className="comp-sub">{(currentDrug.hepaticFraction * 100).toFixed(0)}% Hep · {(currentDrug.renalFraction * 100).toFixed(0)}% Ren</span>
       </div>
      </div>
 

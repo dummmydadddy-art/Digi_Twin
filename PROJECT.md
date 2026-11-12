@@ -210,19 +210,27 @@ BodyParts3D distinguishes between **Parts** (individual raw 3D mesh objects in t
   - Per-kg weight-adjusted dose warning: flags doses exceeding safe single-dose thresholds (e.g. Paracetamol 1000mg in 45kg patient = 22.2 mg/kg, exceeding 15 mg/kg threshold, displaying amber warning).
 - [x] Comprehensive Unit Test Suite (`src/pk/__tests__/pk.test.ts`):
   - 18/18 unit tests passing across 4 suites: mass conservation across 24 hours, patient weight scaling (45kg to 120kg), $T_{\max}$ and $C_{\max}$ literature validation, organ clearance routes (hepatic vs renal predominance), allergy blocks, and per-kg dose warnings.
-- [x] 3D Oral Ingestion Spline & Particle Transit:
-  - Catmull-Rom spline path connecting oral cavity, pharynx, esophagus (`FJ2563`), stomach (`FJ2564`), and duodenum (`FJ2573`).
-  - Swallowed 3D tablet particle (glowing core and soft spherical halo) transits smoothly through the GI tract as layers auto-peel to Organs (78%).
-- [x] Real-time Liver and Kidney Clearance Illumination:
-  - Dynamic 1D data texture (`glowTexture`) sampled in the fragment shader without adding draw calls.
-  - Liver glows with a warm golden-amber metabolic clearance hue (`vec3(0.98, 0.62, 0.16)`) during hepatic metabolism.
-  - Kidneys illuminate with a vibrant cyan filtration hue (`vec3(0.18, 0.84, 0.96)`) during renal excretion.
+- [x] 3D Centreline Spline from Actual Reference Meshes & Instanced Particles:
+  - 22-waypoint Catmull-Rom spline sampled directly from actual mesh bounding boxes and centroids: Oral cavity (`FJ2761`), Esophagus (`FJ2563`), Stomach (`FJ2564` Cardia, Fundus, Body, Pylorus), Duodenum C-loop (`FJ2573`), Jejunum loops (`FJ2606`–`FJ2615`), and Ileum loops (`FJ2574`–`FJ2585`).
+  - 240 instanced particles (`THREE.InstancedMesh`) traveling along the centreline spline.
+  - Molecular density and distribution partitioned strictly by ODE compartment amounts:
+    - Gastric compartment ($A_{\text{stomach}}$): active molecules swirl in stomach cavity ($u \in [0.26, 0.44]$) with electric blue coloring (`#38bdf8`), count $\propto A_{\text{stomach}} / \text{Dose}$.
+    - Intestinal compartment ($A_{\text{gut}}$): molecules flow through duodenum, jejunum, and ileal loops ($u \in [0.44, 0.98]$) with warm amber chyme coloring (`#fbbf24`), count $\propto A_{\text{gut}} / \text{Dose}$.
+    - Systemic absorption ($A_{\text{plasma}}$): molecules diffuse radially into mesenteric capillaries with arterial glow (`#f43f5e`).
+- [x] Liver and Kidney Clearance Glow Driven by Instantaneous Clearance Rate:
+  - Instantaneous elimination rates computed in real time: $\text{Rate}_h = C_p \cdot CL_h$ and $\text{Rate}_r = C_p \cdot CL_r$ (mg/h).
+  - Liver glows with a golden-amber hue (`vec3(0.98, 0.62, 0.16)`) peaking at $T_{\max}$ (peaking at ~57.8 mg/h for paracetamol) and fading as the drug clears.
+  - Kidneys illuminate with a vibrant cyan filtration hue (`vec3(0.18, 0.84, 0.96)`) peaking at 75.1 mg/h for amoxicillin.
+- [x] Time-Speed Controls ($1\times$ to $600\times$) & Robust Playback:
+  - Continuous speed slider ($1\times - 600\times$) plus fast preset buttons (`1x`, `10x`, `60x`, `120x`, `300x`, `600x`).
+  - At $1\times$: slow, minute-by-minute observation ($1\text{ s} = 1\text{ min}$).
+  - At $600\times$: full 24-hour digestion completed in ~2.4 seconds.
+  - Pause button freezes simulation clock and particles in place; Resume seamlessly continues; Reset restores all states and clears particles immediately.
 - [x] Live Bateman Concentration Chart (`#chart`) & Therapeutic Effect Bar (`#eb`):
   - Live 24-hour plasma concentration curve on HTML5 canvas with shaded therapeutic window, dashed MEC line, and dashed toxic threshold line.
   - Live animated effect bar tracking subtherapeutic (< MEC), therapeutic active range, and toxic levels with status badge.
-  - Live compartment mass distribution readouts (Stomach, Gut, Plasma, Liver Cleared, Kidney Excreted).
-  - Simulation playback controls: Play/Pause, speed multipliers ($1\times, 5\times, 20\times$), simulation clock, and reset (Esc).
-- [x] Verified in browser with 7 automated screenshot checkpoints.
+  - Live compartment cards with instantaneous clearance rates (`mg/h`) and accumulated cleared mass (`mg`).
+- [x] Verified in browser with automated screenshot checkpoints across gastric transit, intestinal density, rate-based organ glow, pause, and reset.
 
 ### Phase 6: 60 FPS Polish & Mobile/Desktop Optimization
 - [ ] GPU shader optimization, frame budget auditing, and memory cleanup.

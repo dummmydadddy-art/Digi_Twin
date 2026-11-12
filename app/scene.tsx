@@ -51,25 +51,62 @@ export default function AnatomyScene({atlas,state,onSelect,onPeelChange,onProgre
   const anatomyGroup=new T.Group();scene.add(anatomyGroup);
   const markers=new T.Points(markerGeometry,markerMaterial);markers.frustumCulled=false;markers.renderOrder=10;markers.visible=false;anatomyGroup.add(markers);
 
-  // Ingestion spline: oral cavity -> pharynx -> esophagus -> stomach -> duodenum -> jejunum -> ileum
+  // Centreline Spline from Actual BodyParts3D Reference Meshes
   const ingestionWaypoints = [
-   new T.Vector3(0.000, 1.520, 0.055),
-   new T.Vector3(0.003, 1.440, 0.025),
-   new T.Vector3(0.005, 1.350, 0.000),
-   new T.Vector3(0.007, 1.270, -0.005),
-   new T.Vector3(0.015, 1.200, 0.015),
-   new T.Vector3(0.038, 1.150, 0.038),
-   new T.Vector3(0.010, 1.110, 0.035),
-   new T.Vector3(-0.017, 1.080, 0.030),
-   new T.Vector3(-0.010, 1.020, 0.045),
-   new T.Vector3(0.015, 0.950, 0.050)
+   new T.Vector3(0.000, 1.545, 0.055),   // Oral vestibule / teeth entrance (FJ2761 bounds)
+   new T.Vector3(-0.001, 1.527, 0.040),  // Tongue surface centroid (FJ2761)
+   new T.Vector3(0.000, 1.490, 0.015),   // Oropharynx / hypopharynx
+   new T.Vector3(0.002, 1.440, 0.005),   // Upper esophagus entry (FJ2563 upper)
+   new T.Vector3(0.007, 1.331, -0.005),  // Mid thoracic esophagus centroid (FJ2563 mid)
+   new T.Vector3(0.018, 1.250, 0.005),   // Retrocardiac lower esophagus (FJ2563 lower)
+   new T.Vector3(0.028, 1.215, 0.015),   // Gastroesophageal junction / Cardia (FJ2564)
+   new T.Vector3(0.060, 1.228, 0.012),   // Gastric Fundus dome (FJ2564)
+   new T.Vector3(0.045, 1.176, 0.040),   // Gastric Body / Greater curvature (FJ2564)
+   new T.Vector3(0.010, 1.135, 0.042),   // Pyloric antrum (FJ2564)
+   new T.Vector3(-0.012, 1.120, 0.035),  // Pylorus & Superior Duodenum (FJ2573)
+   new T.Vector3(-0.032, 1.095, 0.028),  // Descending Duodenum C-loop (FJ2573)
+   new T.Vector3(-0.015, 1.075, 0.026),  // Horizontal & ascending Duodenum (FJ2573)
+   new T.Vector3(0.035, 1.070, 0.036),   // Duodenojejunal flexure (FJ2606)
+   new T.Vector3(0.065, 1.035, 0.045),   // Proximal Jejunum upper loop (FJ2607)
+   new T.Vector3(0.075, 1.010, 0.048),   // Mid Jejunum right loop (FJ2608)
+   new T.Vector3(0.035, 0.995, 0.058),   // Mid Jejunum central loop (FJ2610)
+   new T.Vector3(-0.035, 1.005, 0.050),  // Mid Jejunum left loop (FJ2611)
+   new T.Vector3(-0.050, 0.985, 0.046),  // Distal Jejunum / Proximal Ileum (FJ2574)
+   new T.Vector3(0.020, 0.965, 0.055),   // Ileal central coiled loop (FJ2576)
+   new T.Vector3(0.055, 0.945, 0.045),   // Distal Ileum lower loop (FJ2578)
+   new T.Vector3(-0.025, 0.940, 0.030),  // Terminal Ileum (FJ2580 / Ileocecal valve)
   ];
-  const ingestionCurve = new T.CatmullRomCurve3(ingestionWaypoints, false, 'centripetal');
+  const ingestionCurve = new T.CatmullRomCurve3(ingestionWaypoints, false, 'catmullrom', 0.15);
   const pillGroup = new T.Group();
   const pillCore = new T.Mesh(new T.SphereGeometry(0.014, 16, 16), new T.MeshStandardMaterial({color:0x38bdf8,emissive:0x0284c7,emissiveIntensity:1.6,roughness:0.2}));
   const pillHalo = new T.Mesh(new T.SphereGeometry(0.025, 16, 16), new T.MeshBasicMaterial({color:0x7dd3fc,transparent:true,opacity:0.45,depthWrite:false}));
   pillGroup.add(pillCore);pillGroup.add(pillHalo);pillGroup.visible=false;
   anatomyGroup.add(pillGroup);
+
+  const NUM_PARTICLES = 240;
+  const particleGeo = new T.SphereGeometry(0.0055, 8, 8);
+  const particleMat = new T.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:0.88,depthWrite:false});
+  const instancedParticles = new T.InstancedMesh(particleGeo, particleMat, NUM_PARTICLES);
+  instancedParticles.instanceMatrix.setUsage(T.DynamicDrawUsage);
+  instancedParticles.frustumCulled = false;
+  instancedParticles.visible = false;
+  anatomyGroup.add(instancedParticles);
+
+  const particlePhases = new Float32Array(NUM_PARTICLES);
+  const particleAngles = new Float32Array(NUM_PARTICLES);
+  const particleOffsets = new Float32Array(NUM_PARTICLES);
+  for (let i = 0; i < NUM_PARTICLES; i++) {
+   particlePhases[i] = (i / NUM_PARTICLES) + (Math.random() - 0.5) * 0.04;
+   particleAngles[i] = Math.random() * Math.PI * 2;
+   particleOffsets[i] = 0.003 + Math.random() * 0.011;
+  }
+  const particleDummy = new T.Object3D();
+  const particleColor = new T.Color();
+  const pSplinePoint = new T.Vector3();
+  const pSplineTangent = new T.Vector3();
+  const pUpVec = new T.Vector3(0, 1, 0);
+  const pBinormalVec = new T.Vector3();
+  const pPerpVec = new T.Vector3();
 
   const liverPartIndices = new Set<number>();
   const kidneyPartIndices = new Set<number>();
@@ -366,20 +403,92 @@ if (organGlow.a > 0.005) {
    timeUniform.value = clock.getElapsedTime();
    dirty = true;
 
-   // Drug digestion simulation: pill transit & organ clearance glow
+   // Drug digestion simulation: pill transit, instanced particles & organ clearance glow
    if (s.simulation?.active) {
     const sim = s.simulation;
     const prog = Math.max(0, Math.min(1, sim.progress));
-    if (prog < 0.99) {
+    
+    // 1. Initial swallow bolus transit along esophagus into stomach
+    if (prog < 0.35) {
      pillGroup.visible = true;
-     ingestionCurve.getPoint(prog, pillGroup.position);
-     const pillScale = Math.max(0.12, 1.0 - prog * 0.75);
+     const bolusU = Math.min(0.28, (prog / 0.35) * 0.28);
+     ingestionCurve.getPoint(bolusU, pillGroup.position);
+     const pillScale = Math.max(0.15, 1.0 - (prog / 0.35) * 0.65);
      pillGroup.scale.set(pillScale, pillScale, pillScale);
      pillHalo.scale.setScalar(1.0 + Math.sin(clock.getElapsedTime() * 12.0) * 0.22);
     } else {
      pillGroup.visible = false;
     }
 
+    // 2. Instanced particles with density driven by compartment amounts
+    instancedParticles.visible = true;
+    const stomachFrac = Math.max(0, Math.min(1, sim.stomachLevel));
+    const gutFrac = Math.max(0, Math.min(1, sim.gutLevel));
+    const plasmaFrac = Math.max(0, Math.min(1, sim.plasmaLevel));
+    const timeFlow = clock.getElapsedTime();
+
+    for (let i = 0; i < NUM_PARTICLES; i++) {
+     let u = 0;
+     let scale = 0;
+     let radialDist = particleOffsets[i];
+     const ang = particleAngles[i] + timeFlow * 0.8;
+
+     if (i < 120) {
+      // Stomach pool: active when stomachFrac > 0.005
+      if (stomachFrac > 0.005) {
+       // Gastric segment is u in [0.26, 0.44]
+       const localP = ((particlePhases[i] * 1.5 + timeFlow * 0.08) % 1.0);
+       u = 0.26 + localP * 0.18;
+       scale = Math.min(1.2, 0.4 + stomachFrac * 0.8);
+       particleColor.setRGB(0.22, 0.74, 0.98); // Vibrant cyan / electric blue
+      } else {
+       scale = 0;
+      }
+     } else {
+      // Intestinal gut pool: active when gutFrac > 0.005
+      if (gutFrac > 0.005) {
+       // Gut segment is u in [0.44, 0.98]
+       const localP = ((particlePhases[i] * 1.2 + timeFlow * 0.15) % 1.0);
+       u = 0.44 + localP * 0.54;
+       scale = Math.min(1.1, 0.35 + gutFrac * 0.75);
+       particleColor.setRGB(0.98, 0.75, 0.22); // Warm amber chyme
+      } else if (plasmaFrac > 0.01 && (i % 2 === 0)) {
+       // Absorbed drug particles diffusing into mesenteric capillaries & systemic blood
+       const localP = ((particlePhases[i] + timeFlow * 0.25) % 1.0);
+       u = 0.46 + localP * 0.40;
+       scale = Math.min(0.8, plasmaFrac * 0.7);
+       radialDist = particleOffsets[i] * 2.8;
+       particleColor.setRGB(0.95, 0.25, 0.42); // Arterial capillary glow
+      } else {
+       scale = 0;
+      }
+     }
+
+     if (scale > 0.001) {
+      const clampedU = Math.max(0, Math.min(1, u));
+      ingestionCurve.getPoint(clampedU, pSplinePoint);
+      ingestionCurve.getTangent(clampedU, pSplineTangent);
+      pBinormalVec.crossVectors(pSplineTangent, pUpVec).normalize();
+      pPerpVec.crossVectors(pBinormalVec, pSplineTangent).normalize();
+
+      particleDummy.position.copy(pSplinePoint)
+       .addScaledVector(pBinormalVec, Math.cos(ang) * radialDist)
+       .addScaledVector(pPerpVec, Math.sin(ang) * radialDist);
+      particleDummy.scale.setScalar(scale);
+      particleDummy.updateMatrix();
+      instancedParticles.setMatrixAt(i, particleDummy.matrix);
+      instancedParticles.setColorAt(i, particleColor);
+     } else {
+      particleDummy.position.set(0, -100, 0);
+      particleDummy.scale.setScalar(0);
+      particleDummy.updateMatrix();
+      instancedParticles.setMatrixAt(i, particleDummy.matrix);
+     }
+    }
+    instancedParticles.instanceMatrix.needsUpdate = true;
+    if (instancedParticles.instanceColor) instancedParticles.instanceColor.needsUpdate = true;
+
+    // 3. Organ clearance glow: Liver and Kidney illuminate strictly by clearance rate
     atlas.parts.forEach((p, i) => {
      let r = 0, g = 0, b = 0, a = 0;
      if (liverPartIndices.has(i)) r = Math.round(sim.liverIntensity * 255);
@@ -396,6 +505,16 @@ if (organGlow.a > 0.005) {
     dirty = true;
    } else {
     if (pillGroup.visible) pillGroup.visible = false;
+    if (instancedParticles.visible) {
+     instancedParticles.visible = false;
+     for (let i = 0; i < NUM_PARTICLES; i++) {
+      particleDummy.position.set(0, -100, 0);
+      particleDummy.scale.setScalar(0);
+      particleDummy.updateMatrix();
+      instancedParticles.setMatrixAt(i, particleDummy.matrix);
+     }
+     instancedParticles.instanceMatrix.needsUpdate = true;
+    }
     if (glowData[0] !== 0 || glowData[1] !== 0) {
      glowData.fill(0);
      glowTexture.needsUpdate = true;

@@ -192,8 +192,13 @@ export interface SimulationVisualState {
  stomachLevel: number;   // 0.0 to 1.0 relative stomach residue
  gutLevel: number;       // 0.0 to 1.0 relative intestinal lumen amount
  plasmaLevel: number;    // 0.0 to 1.0 relative systemic plasma concentration
- liverIntensity: number; // 0.0 to 1.0 instantaneous hepatic metabolic load
- kidneyIntensity: number;// 0.0 to 1.0 instantaneous renal excretion load
+ liverIntensity: number; // 0.0 to 1.0 instantaneous hepatic metabolic clearance rate
+ kidneyIntensity: number;// 0.0 to 1.0 instantaneous renal excretion clearance rate
+ hepaticRateMgH?: number;// mg/hour instantaneous clearance rate
+ renalRateMgH?: number;  // mg/hour instantaneous clearance rate
+ stomachMg?: number;
+ gutMg?: number;
+ plasmaMg?: number;
 }
 
 export interface SceneState {

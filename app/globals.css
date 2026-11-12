@@ -785,6 +785,51 @@ h1 .edition{font-family:inherit;font-weight:500;font-size:10px;letter-spacing:.0
   font-weight: 400;
   color: #64748b;
 }
+.comp-sub {
+  font-size: 9px;
+  color: #64748b;
+  margin-top: 1px;
+}
+
+.playback-speed-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.speed-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 11px;
+}
+.speed-title {
+  color: #334155;
+  font-weight: 500;
+}
+.speed-title strong {
+  color: #0284c7;
+  font-weight: 700;
+}
+.speed-sub {
+  font-size: 10px;
+  color: #64748b;
+  font-family: monospace;
+}
+.speed-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.speed-range-slider {
+  flex: 1;
+  accent-color: #0284c7;
+  cursor: pointer;
+  height: 5px;
+}
 
 .citations-accordion {
   border-top: 1px solid #e2e8f0;
