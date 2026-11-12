@@ -9,9 +9,9 @@ import {Switch} from '@/components/ui/switch';
 import {Sheet,SheetContent,SheetTitle,SheetDescription} from '@/components/ui/sheet';
 import {Combobox,ComboboxInput,ComboboxContent,ComboboxList,ComboboxItem,ComboboxEmpty} from '@/components/ui/combobox';
 import AnatomyScene from './scene';
-import {DEFAULT_VISIBLE,SYSTEMS,EXPLANATIONS,explanation,getSystemTier,type Atlas,type Concept,type SceneState,type SystemId,type View} from './anatomy';
+import {DEFAULT_VISIBLE,SYSTEMS,EXPLANATIONS,explanation,getSystemTier,getOrganDossier,type Atlas,type Concept,type SceneState,type SystemId,type View} from './anatomy';
 
-const initial:SceneState={explode:0,peel:0,visible:DEFAULT_VISIBLE,selected:[],isolate:false,view:'three-quarter',rotate:false,reset:0};
+const initial:SceneState={explode:0,peel:0,cutaway:true,visible:DEFAULT_VISIBLE,selected:[],isolate:false,view:'three-quarter',rotate:false,reset:0};
 
 function getPeelTierLabel(peel:number=0):string{
  const p=peel??0;
@@ -31,7 +31,7 @@ export default function Home(){
   return()=>abort.abort();
  },[]);
 
- const reset=()=>{setState(s=>({...initial,visible:DEFAULT_VISIBLE,reset:s.reset+1}));setChosen(null);setDetails(false);setPanel(null);};
+ const reset=()=>{setState(s=>({...initial,cutaway:true,visible:DEFAULT_VISIBLE,reset:s.reset+1}));setChosen(null);setDetails(false);setPanel(null);};
 
  useEffect(()=>{
   const key=(e:KeyboardEvent)=>{
@@ -65,7 +65,7 @@ export default function Home(){
   const firstPart=c.elements[0]?parts.get(c.elements[0]):null;
   const tier=firstPart?getSystemTier(firstPart.system):3;
   const organPeel=tier===3?.78:tier===2?.54:tier===1?.26:0;
-  setState(s=>({...s,selected:c.elements,peel:Math.max(s.peel??0,organPeel),isolate:false,rotate:false}));
+  setState(s=>({...s,selected:c.elements,peel:Math.max(s.peel??0,organPeel),cutaway:true,isolate:false,rotate:false}));
   setDetails(true);setPanel(null);
  };
 
@@ -76,7 +76,7 @@ export default function Home(){
   setChosen({id:p.conceptId,name:p.name,elements:[id]});
   const tier=getSystemTier(p.system);
   const organPeel=tier===3?.78:tier===2?.54:tier===1?.26:0;
-  setState(s=>({...s,selected:[id],peel:Math.max(s.peel??0,organPeel),isolate:false,rotate:false}));
+  setState(s=>({...s,selected:[id],peel:Math.max(s.peel??0,organPeel),cutaway:true,isolate:false,rotate:false}));
   setDetails(true);setPanel(null);
  };
 
@@ -114,7 +114,76 @@ export default function Home(){
   <footer className="studio-footer"><span>{state.explode>.8?'Drag to pan':'Drag to orbit 360°'} <b>·</b> Scroll over organ to peel & zoom <b>·</b> Tap to inspect <b>·</b> Esc to reset</span><Button variant="ghost" onClick={()=>{setDetails(false);setPanel(null);setAbout(true);}}>Source & credits <ArrowUpRight size={12}/></Button></footer>
   {progress<100&&!error&&<div className="loading glass" role="status"><Activity size={18}/><div><strong>Preparing the anatomy</strong><span>{progress}% · Loading {atlas?.parts.length.toLocaleString()??'2,234'} pieces</span><div className="loading-track"><i style={{width:`${progress}%`}}/></div></div></div>}
   {error&&<div className="loading glass error" role="alert"><p>{error}</p><Button variant="ghost" onClick={()=>location.reload()}>Reload viewer</Button></div>}
-  <Sheet open={details&&selectedParts.length>0} modal={false} disablePointerDismissal onOpenChange={setDetails}><SheetContent initialFocus={detailTitle} className={`detail-sheet glass ${state.isolate?'is-isolated':''}`} showCloseButton={true}><div className="detail-header"><div className="detail-accent" style={{background:system?.color}}/><div className="eyebrow">{system?.name??'ANATOMY'}</div><SheetTitle ref={detailTitle} tabIndex={-1} className="structure-title">{chosen?.name}</SheetTitle></div><div className="detail-scroll" key={`${chosen?.id}-${state.isolate}`}><SheetDescription className="structure-description">{chosen&&selected?explanation(chosen.name,selected.system):''}</SheetDescription>{chosen&&!EXPLANATIONS[chosen.name.toLowerCase()]&&<span className="context-note">System overview · structure identified from source anatomy</span>}<div className="structure-meta"><span>Atlas reference<strong>{chosen?.id}</strong></span><span>Selected pieces<strong>{state.selected.length.toLocaleString()}</strong></span></div>{selectedParts.length>1&&<div className="member-list"><h3>Included structures</h3>{selectedParts.slice(0,50).map(p=><Button variant="ghost" key={p.id} onClick={()=>choosePart(p.id)}><span>{p.name}</span><ChevronRight size={14}/></Button>)}{selectedParts.length>50&&<p>And {selectedParts.length-50} more modeled pieces.</p>}</div>}<a className="source-link" href="https://lifesciencedb.jp/bp3d/" target="_blank" rel="noreferrer">View anatomical source <ArrowUpRight size={14}/></a></div><div className="detail-actions"><Button className={`primary-action ${state.isolate?'active':''}`} onClick={()=>setState(s=>({...s,isolate:!s.isolate,explode:0}))}><Focus size={18}/>{state.isolate?'Show surrounding anatomy':'Isolate structure'}<ChevronRight size={16}/></Button><Button variant="ghost" className="secondary-action" onClick={()=>{setState(s=>({...s,selected:[],isolate:false}));setDetails(false);}}>Clear selection</Button></div></SheetContent></Sheet>
+  <Sheet open={details&&selectedParts.length>0} modal={false} disablePointerDismissal onOpenChange={setDetails}>
+   <SheetContent initialFocus={detailTitle} className={`detail-sheet glass ${state.isolate?'is-isolated':''}`} showCloseButton={true}>
+    {(()=>{
+     const dossier=chosen?getOrganDossier(chosen.name):null;
+     return <>
+      <div className="detail-header">
+       <div className="detail-accent" style={{background:system?.color}}/>
+       <div className="eyebrow">{system?.name??'ANATOMY'}</div>
+       <SheetTitle ref={detailTitle} tabIndex={-1} className="structure-title">{chosen?.name}</SheetTitle>
+      </div>
+      <div className="detail-scroll" key={`${chosen?.id}-${state.isolate}`}>
+       <div className="cutaway-toggle-card">
+        <div className="cutaway-info">
+         <strong>Cutaway Cross-Section</strong>
+         <span>{state.cutaway?'Interior lumen with colored wall cap':'Full outer organ surface'}</span>
+        </div>
+        <Switch checked={state.cutaway} onCheckedChange={c=>setState(s=>({...s,cutaway:c}))} aria-label="Toggle organ cutaway cross-section" />
+       </div>
+
+       {dossier?.isSurfaceOnly?(
+        <div className="geometry-badge surface-only">
+         <span className="badge-bullet">ℹ</span>
+         <p><strong>Surface-only reference mesh:</strong> Surface-only mesh in reference anatomy; cross-section generated via shader cutaway.</p>
+        </div>
+       ):dossier?.geometryNote?(
+        <div className="geometry-badge internal-geometry">
+         <span className="badge-bullet">✓</span>
+         <p><strong>Internal sub-structures:</strong> {dossier.geometryNote}</p>
+        </div>
+       ):null}
+
+       <div className="dossier-block">
+        <span className="dossier-kicker">PHYSIOLOGICAL FUNCTION</span>
+        <SheetDescription className="structure-description">{dossier?dossier.function:explanation(chosen?.name??'',selected?.system??'digestive')}</SheetDescription>
+       </div>
+
+       {dossier?.location&&(
+        <div className="dossier-block">
+         <span className="dossier-kicker">ANATOMICAL LOCATION</span>
+         <p className="dossier-location">{dossier.location}</p>
+        </div>
+       )}
+
+       {dossier?.facts&&dossier.facts.length>0&&(
+        <div className="dossier-block">
+         <span className="dossier-kicker">CLINICAL & PHARMACOLOGICAL FACTS</span>
+         <ul className="dossier-fact-list">
+          {dossier.facts.map((fact,idx)=>(
+           <li key={idx}><span className="fact-index">0{idx+1}</span><span>{fact}</span></li>
+          ))}
+         </ul>
+        </div>
+       )}
+
+       <div className="structure-meta">
+        <span>Atlas reference<strong>{chosen?.id}</strong></span>
+        <span>Selected pieces<strong>{state.selected.length.toLocaleString()}</strong></span>
+       </div>
+
+       {selectedParts.length>1&&<div className="member-list"><h3>Included structures</h3>{selectedParts.slice(0,50).map(p=><Button variant="ghost" key={p.id} onClick={()=>choosePart(p.id)}><span>{p.name}</span><ChevronRight size={14}/></Button>)}{selectedParts.length>50&&<p>And {selectedParts.length-50} more modeled pieces.</p>}</div>}
+       <a className="source-link" href="https://lifesciencedb.jp/bp3d/" target="_blank" rel="noreferrer">View anatomical source <ArrowUpRight size={14}/></a>
+      </div>
+      <div className="detail-actions">
+       <Button className={`primary-action ${state.isolate?'active':''}`} onClick={()=>setState(s=>({...s,isolate:!s.isolate,explode:0}))}><Focus size={18}/>{state.isolate?'Show surrounding anatomy':'Isolate structure'}<ChevronRight size={16}/></Button>
+       <Button variant="ghost" className="secondary-action" onClick={()=>{setState(s=>({...s,selected:[],isolate:false}));setDetails(false);}}>Clear selection</Button>
+      </div>
+     </>;
+    })()}
+   </SheetContent>
+  </Sheet>
   <Sheet open={about} onOpenChange={setAbout}><SheetContent className="about-sheet glass"><div className="eyebrow">SOURCE & SCOPE</div><SheetTitle className="structure-title">Body Twin</SheetTitle><SheetDescription>Educational 3D human anatomy and drug-digestion simulator.</SheetDescription><div className="about-copy"><p><strong>Educational Disclaimer</strong><br/>Stylized anatomy and simplified pharmacokinetics for educational demonstration only. Not medical advice.</p><p><strong>Male · BodyParts3D Reference</strong><br/>2,234 individual meshes and 3,432 named concepts from an adult male reference anatomy.</p><p>This reference does not contain every human structure or variation. Named concepts can contain multiple pieces; each source mesh is rendered once.</p><h3>Source & Licensing</h3><p>BodyParts3D, © The Database Center for Life Science licensed under CC Attribution 4.0 International.</p><p>Built upon the open-source Human Atlas architecture (MIT License).</p><a href="https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html" target="_blank" rel="noreferrer">Dataset license <ArrowUpRight size={14}/></a><a href="https://dbarchive.biosciencedbc.jp/en/bodyparts3d/download.html" target="_blank" rel="noreferrer">Original geometry & metadata <ArrowUpRight size={14}/></a><a href="https://academic.oup.com/nar/article/37/suppl_1/D782/1000752" target="_blank" rel="noreferrer">Read the source publication <ArrowUpRight size={14}/></a></div></SheetContent></Sheet>
  </main>;
 }

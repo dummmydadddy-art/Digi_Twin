@@ -58,6 +58,7 @@ export default function AnatomyScene({atlas,state,onSelect,onPeelChange,onProgre
   };
 
   const peelUniform={value:0},peelCenterUniform={value:new T.Vector3(0,.88,0)},peelRadiusUniform={value:0};
+  const timeUniform={value:0},cutawayUniform={value:0},focusCenterUniform={value:new T.Vector3(0,.88,0)};
   let currentPeel=0,targetPeel=0,currentPeelRadius=0,targetPeelRadius=0;
   const currentPeelCenter=new T.Vector3(0,.88,0),targetPeelCenter=new T.Vector3(0,.88,0);
   let flyingTo:{target:T.Vector3;cameraPos:T.Vector3}|null=null;
@@ -65,15 +66,48 @@ export default function AnatomyScene({atlas,state,onSelect,onPeelChange,onProgre
   const materialFor=(system:string)=>{
    const tier=getSystemTier(system as SystemId);
    const isSkin=system==='integumentary';
+   const motionType=system==='cardiac'?1.0:system==='respiratory'?2.0:system==='digestive'?3.0:0.0;
    const m=new T.MeshStandardMaterial({color:SYSTEMS.find(s=>s.id===system)?.color??'#aebbb8',metalness:.08,roughness:.53,side:T.DoubleSide,transparent:isSkin,opacity:isSkin?.88:1,depthWrite:true});
    m.onBeforeCompile=shader=>{
     shader.uniforms.partState={value:partTexture};shader.uniforms.selectionState={value:selectionTexture};shader.uniforms.stateWidth={value:width};
     shader.uniforms.uPeel=peelUniform;shader.uniforms.uPeelCenter=peelCenterUniform;shader.uniforms.uPeelRadius=peelRadiusUniform;shader.uniforms.uTier={value:tier};
-    shader.vertexShader='attribute float partIndex; uniform sampler2D partState; uniform sampler2D selectionState; uniform float stateWidth; varying float partVisible; varying float partSelected; varying vec3 vWorldPosition;\n'+shader.vertexShader;
-    shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nvec2 stateUv = vec2((partIndex + 0.5) / stateWidth, 0.5); vec4 state = texture2D(partState, stateUv); transformed += state.xyz; partVisible = state.w; partSelected = texture2D(selectionState, stateUv).r; vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    shader.fragmentShader='varying float partVisible; varying float partSelected; varying vec3 vWorldPosition;\nuniform float uPeel; uniform vec3 uPeelCenter; uniform float uPeelRadius; uniform float uTier;\n'+shader.fragmentShader;
+    shader.uniforms.uTime=timeUniform;shader.uniforms.uMotionType={value:motionType};
+    shader.uniforms.uCutawayEnabled=cutawayUniform;shader.uniforms.uFocusCenter=focusCenterUniform;
+
+    shader.vertexShader='attribute float partIndex; uniform sampler2D partState; uniform sampler2D selectionState; uniform float stateWidth; uniform float uTime; uniform float uMotionType; varying float partVisible; varying float partSelected; varying vec3 vWorldPosition;\n'+shader.vertexShader;
+    shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
+vec2 stateUv = vec2((partIndex + 0.5) / stateWidth, 0.5);
+vec4 state = texture2D(partState, stateUv);
+transformed += state.xyz;
+
+// Honest, physiological motion
+if (uMotionType > 0.5 && uMotionType < 1.5) {
+ float beat = sin(uTime * 7.54);
+ float pulse = pow(max(0.0, beat), 3.0) * 0.040 - pow(max(0.0, -beat), 2.0) * 0.015;
+ transformed += normal * pulse;
+} else if (uMotionType > 1.5 && uMotionType < 2.5) {
+ float breath = sin(uTime * 1.45) * 0.022;
+ transformed.x += sign(transformed.x) * breath;
+ transformed.z += breath * 0.65;
+} else if (uMotionType > 2.5 && uMotionType < 3.5) {
+ float wave = sin(transformed.y * 20.0 - uTime * 3.0) * 0.012;
+ transformed += normal * wave;
+}
+
+partVisible = state.w;
+partSelected = texture2D(selectionState, stateUv).r;
+vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
+
+    shader.fragmentShader='varying float partVisible; varying float partSelected; varying vec3 vWorldPosition;\nuniform float uPeel; uniform vec3 uPeelCenter; uniform float uPeelRadius; uniform float uTier; uniform float uCutawayEnabled; uniform vec3 uFocusCenter;\n'+shader.fragmentShader;
     shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>',`#include <clipping_planes_fragment>
 if (partVisible < 0.5) discard;
+
+// Cutaway slice for the focused organ
+if (uCutawayEnabled > 0.5 && partSelected > 0.5) {
+ float cutDist = vWorldPosition.z - uFocusCenter.z;
+ if (cutDist > 0.001) discard;
+}
+
 float localPeel = uPeel;
 if (uPeelRadius > 0.001) {
  float dist = distance(vWorldPosition, uPeelCenter);
@@ -103,9 +137,26 @@ if (tierAlpha < 0.98) {
  float ditherVal = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
  if (ditherVal > tierAlpha) discard;
 }`);
-    shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.85, 0.78), partSelected * 0.75);');
+
+    shader.fragmentShader=shader.fragmentShader.replace('#include <color_fragment>',`#include <color_fragment>
+// Interior lumen mucosal shading for backfaces exposed by the cutaway
+if (!gl_FrontFacing) {
+ vec3 mucosalTint = vec3(0.68, 0.22, 0.24);
+ diffuseColor.rgb = mix(diffuseColor.rgb * 0.60, mucosalTint, 0.65);
+}
+
+// Coloured cap / cross-sectional border at cut boundary
+if (uCutawayEnabled > 0.5 && partSelected > 0.5) {
+ float cutDist = abs(vWorldPosition.z - uFocusCenter.z);
+ if (cutDist < 0.0035) {
+  diffuseColor.rgb = vec3(0.95, 0.45, 0.38);
+ }
+}
+
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.85, 0.78), partSelected * 0.75);`);
    };materials.push(m);return m;
   };
+
   const mats=new Map(SYSTEMS.map(s=>[s.id,materialFor(s.id)]));
   let loaded=0;
   const loadChunk=async(ci:number)=>{
@@ -189,6 +240,7 @@ if (tierAlpha < 0.98) {
     hover.hidden=true;
     select.current(atlas.parts[found].id);
     const organCenter=centers[found];
+    focusCenterUniform.value.copy(organCenter);
     const size=bounds[found].getSize(new T.Vector3());
     const maxDim=Math.max(size.x,size.y,size.z,.08);
     const viewDir=new T.Vector3().subVectors(camera.position,controls.target).normalize();
@@ -251,6 +303,18 @@ if (tierAlpha < 0.98) {
    const changed=lastState?.visible!==s.visible||lastState?.selected!==s.selected||lastState?.isolate!==s.isolate;
    const moving=Math.abs(amount-s.explode)>.0001;
    if(moving){amount=T.MathUtils.damp(amount,s.explode,8,dt);dirty=true;}
+
+   // Honest physiological animation continuously runs in vertex shader via uTime
+   timeUniform.value=clock.getElapsedTime();
+   dirty=true;
+
+   // Update cutaway center and state
+   if(s.selected.length>0){
+    const box=new T.Box3();
+    atlas.parts.forEach((p,i)=>{if(s.selected.includes(p.id))box.union(bounds[i]);});
+    if(!box.isEmpty()){focusCenterUniform.value.copy(box.getCenter(new T.Vector3()));}
+   }
+   cutawayUniform.value=s.cutaway&&s.selected.length>0?1.0:0.0;
 
    if(Math.abs((s.peel??0)-targetPeel)>.001){targetPeel=s.peel??0;targetPeelRadius=0;dirty=true;}
    if(Math.abs(currentPeel-targetPeel)>.0001||Math.abs(currentPeelRadius-targetPeelRadius)>.0001){

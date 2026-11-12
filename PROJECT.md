@@ -167,11 +167,19 @@ BodyParts3D distinguishes between **Parts** (individual raw 3D mesh objects in t
 - [x] Visible Layer Peeling slider in bottom dock as touch fallback with live status badge (`Skin`, `Muscles`, `Skeleton`, `Organs`).
 - [x] Verified in browser: progressive peeling (Skin 0% -> Muscles 35% -> Skeleton 65% -> Organs 85%), click-to-focus on Heart with inspector sheet, Escape key reset, and wheel dolly peeling.
 
-### Phase 3: Cutaway View & Organ Info Card (Next Phase)
-- [ ] Implement cutaway / sectional clipping or selective transparency for focused organ.
-- [ ] Render concise organ dossier card with physiological function & pharmacological role.
+### Phase 3: Cutaway View, Physiological Motion & Clinical Dossier Card (Completed)
+- [x] Implement selective clipping-plane cutaway shader for focused organs (`uCutawayEnabled`, `uFocusCenter`, `uCutawayNormal`, `uCutawayOffset`) with colored cap boundary edge (`#38bdf8`) and mucosal backface illumination (`!gl_FrontFacing`).
+- [x] Add honest physiological motion in vertex shaders:
+  - Cardiac: two-stage lub-dub systolic ventricular contraction & diastolic atrial relaxation (~72 bpm).
+  - Respiratory: gentle rhythmic thoracic expansion (~14 bpm).
+  - Digestive: progressive traveling peristalsis wave along small intestine loops.
+- [x] Organ dossier card with location, physiological function, and 3 clinical/pharmacological facts.
+- [x] Explicit geometry notice badge: distinguished multi-part internal compound structures (e.g. Heart with 83 parts) vs surface-only reference meshes (e.g. Stomach, Kidneys) labeled with: *"Surface-only mesh in reference anatomy; cross-section generated via shader cutaway."*
+- [x] Cutaway toggle switch allows switching between full outer surface and cross-sectional cutaway.
+- [x] Escape key resets camera and dismisses detail panel.
+- [x] Verified in browser with 4 high-resolution screenshots.
 
-### Phase 4: Patient Profile Panel & Morphological Scaling
+### Phase 4: Patient Profile Panel & Morphological Scaling (Next Phase)
 - [ ] Add Patient Panel: Sex, Age, Height (cm), Weight (kg), Blood Group, Drug Allergy.
 - [ ] Dynamic scaling of anatomical model (height Y, girth X/Z) with label noting adult male reference approximation.
 

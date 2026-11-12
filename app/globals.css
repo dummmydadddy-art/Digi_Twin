@@ -86,3 +86,22 @@ h1 .edition{font-family:inherit;font-weight:500;font-size:10px;letter-spacing:.0
 @media(max-width:767px){body:has(.detail-sheet) .view-controls{visibility:hidden}}
 
 @media(max-height:600px) and (orientation:landscape){body:has(.detail-sheet) .bottom-dock{left:12px;right:324px;width:auto;transform:none;max-width:none;margin:0}}
+
+/* Organ Dossier & Cutaway Styles */
+.cutaway-toggle-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:#18253606;border:1px solid #18253612;border-radius:10px}
+.cutaway-info{display:flex;flex-direction:column;gap:2px}
+.cutaway-info strong{font-size:12.5px;color:#243340;font-weight:600}
+.cutaway-info span{font-size:11px;color:#6b7987}
+.geometry-badge{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:8px;font-size:11.5px;line-height:1.5}
+.geometry-badge p{margin:0}
+.geometry-badge strong{display:inline;margin-right:4px}
+.geometry-badge.surface-only{background:#fef3c733;border:1px solid #f59e0b40;color:#92400e}
+.geometry-badge.surface-only .badge-bullet{color:#d97706;font-weight:700}
+.geometry-badge.internal-geometry{background:#ecfdf566;border:1px solid #10b9813b;color:#065f46}
+.geometry-badge.internal-geometry .badge-bullet{color:#059669;font-weight:700}
+.dossier-block{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+.dossier-kicker{font-size:10px;font-weight:700;letter-spacing:.12em;color:#7e8b97}
+.dossier-location{font-size:13px;line-height:1.55;color:#475564;margin:0}
+.dossier-fact-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+.dossier-fact-list li{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;line-height:1.5;color:#475461}
+.fact-index{font-size:10px;font-weight:700;background:#edf2f5;color:#4f6272;padding:2px 5px;border-radius:4px;flex-shrink:0;margin-top:2px}
