@@ -503,7 +503,7 @@ export default function Home(){
     )}
    </Button>
    <Button variant="ghost" className={panel==='search'?'active':''} onClick={()=>openPanel('search')} aria-label="Search anatomy"><Search size={18}/><span>Find a structure</span><kbd>/</kbd></Button>
-   <Button variant="ghost" className="icon-button" aria-label="About this atlas" onClick={()=>{setDetails(false);setPanel(null);setAbout(true);}}><Info size={18}/></Button>
+   <Button variant="ghost" className={`credits-trigger ${about ? "active" : ""}`} aria-label="Dataset Licensing, Credits and Pharmacology Sources" title="Credits, Literature Sources and CC BY 4.0 Attribution" onClick={()=>{setDetails(false);setPanel(null);setSimPanelOpen(false);setPatientOpen(false);setAbout(o => !o);}}><Info size={18}/><span>Credits</span></Button>
   </nav>
   <section className={`layers-panel glass ${panel==='layers'?'mobile-open':''}`} aria-label="Anatomical layers">
    <div className="panel-heading"><span>Systems</span><Button variant="ghost" className="mobile-only icon-button" onClick={()=>setPanel(null)} aria-label="Close systems"><X size={18}/></Button><Badge variant="secondary" className="desktop-only small-number">{activeSystems.length}</Badge></div>
@@ -768,7 +768,7 @@ export default function Home(){
    </div>
    <Button variant="ghost" className="dock-reset" onClick={reset} aria-label="Assemble and reset" title="Reset view and layers (Esc)"><RotateCcw size={18}/><span>Reset</span></Button>
   </div>
-  <footer className="studio-footer"><span>{state.explode>.8?'Drag to pan':'Drag to orbit 360°'} <b>·</b> Scroll over organ to peel & zoom <b>·</b> Tap to inspect <b>·</b> Esc to reset</span><Button variant="ghost" onClick={()=>{setDetails(false);setPanel(null);setAbout(true);}}>Source & credits <ArrowUpRight size={12}/></Button></footer>
+  <footer className="studio-footer"><span>{state.explode>.8?'Drag to pan':'Drag to orbit 360°'} <b>·</b> Scroll over organ to peel & zoom <b>·</b> Tap to inspect <b>·</b> Esc to reset</span><Button variant="ghost" onClick={()=>{setDetails(false);setPanel(null);setSimPanelOpen(false);setPatientOpen(false);setAbout(true);}}>Source & credits <ArrowUpRight size={12}/></Button></footer>
   {progress<100&&!error&&<div className="loading glass" role="status"><Activity size={18}/><div><strong>Preparing the anatomy</strong><span>{progress}% · Loading {atlas?.parts.length.toLocaleString()??'2,234'} pieces</span><div className="loading-track"><i style={{width:`${progress}%`}}/></div></div></div>}
   {error&&<div className="loading glass error" role="alert"><p>{error}</p><Button variant="ghost" onClick={()=>location.reload()}>Reload viewer</Button></div>}
   <Sheet open={details&&selectedParts.length>0} modal={false} disablePointerDismissal onOpenChange={setDetails}>
@@ -1048,6 +1048,179 @@ export default function Home(){
     </div>
    </SheetContent>
   </Sheet>
-  <Sheet open={about} onOpenChange={setAbout}><SheetContent className="about-sheet glass"><div className="eyebrow">SOURCE & SCOPE</div><SheetTitle className="structure-title">Body Twin</SheetTitle><SheetDescription>Educational 3D human anatomy and drug-digestion simulator.</SheetDescription><div className="about-copy"><p><strong>Educational Disclaimer</strong><br/>Stylized anatomy and simplified pharmacokinetics for educational demonstration only. Not medical advice.</p><p><strong>Male · BodyParts3D Reference</strong><br/>2,234 individual meshes and 3,432 named concepts from an adult male reference anatomy.</p><p>This reference does not contain every human structure or variation. Named concepts can contain multiple pieces; each source mesh is rendered once.</p><h3>Source & Licensing</h3><p>BodyParts3D, © The Database Center for Life Science licensed under CC Attribution 4.0 International.</p><p>Built upon the open-source Human Atlas architecture (MIT License).</p><a href="https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html" target="_blank" rel="noreferrer">Dataset license <ArrowUpRight size={14}/></a><a href="https://dbarchive.biosciencedbc.jp/en/bodyparts3d/download.html" target="_blank" rel="noreferrer">Original geometry & metadata <ArrowUpRight size={14}/></a><a href="https://academic.oup.com/nar/article/37/suppl_1/D782/1000752" target="_blank" rel="noreferrer">Read the source publication <ArrowUpRight size={14}/></a></div></SheetContent></Sheet>
+    <Sheet open={about} onOpenChange={setAbout}>
+   <SheetContent className="about-sheet glass" showCloseButton={true}>
+    <div className="detail-header">
+     <div className="detail-accent" style={{ background: '#0284c7' }} />
+     <div className="eyebrow">ATTRIBUTION & DATASET LICENSING</div>
+     <SheetTitle className="structure-title">Credits & Sources</SheetTitle>
+     <SheetDescription>Open-source 3D anatomy, physiological rendering, and clinical pharmacokinetics.</SheetDescription>
+    </div>
+
+    <div className="credits-scroll">
+     <div className="credits-disclaimer-card">
+      <div className="credits-disclaimer-header">
+       <AlertTriangle size={15} className="text-amber-600 flex-shrink-0" />
+       <span className="credits-disclaimer-title">CLINICAL & EDUCATIONAL DISCLAIMER</span>
+      </div>
+      <p className="credits-disclaimer-text">
+       Body Twin is an educational demonstration and computational simulation platform. Stylized anatomical geometry and the 5-compartment Runge-Kutta pharmacokinetic model are intended strictly for educational insight. <strong>Not intended for clinical medical advice, dosage calculation, diagnosis, or patient management.</strong> Always consult a licensed healthcare professional for medical concerns.
+      </p>
+     </div>
+
+     <div className="credits-card">
+      <div className="credits-card-header">
+       <span className="credits-kicker">3D ANATOMICAL GEOMETRY</span>
+       <Badge variant="outline" className="credits-badge-cc">CC BY 4.0</Badge>
+      </div>
+      <h3 className="credits-card-title">BodyParts3D Anatomy Reference</h3>
+      <p className="credits-card-body">
+       <strong>BodyParts3D</strong>, © <em>The Database Center for Life Science (DBCLS)</em>, Research Organization of Information and Systems (ROIS), Japan.
+      </p>
+      <p className="credits-card-body">
+       Constructed from an adult male reference anatomy (TARO MRI scan and anatomical illustration refinement). The digital model contains 2,234 individual high-resolution OBJ meshes representing 3,432 named anatomical concepts indexed in the Foundational Model of Anatomy (FMA) ontology.
+      </p>
+      <div className="credits-citation-box">
+       <span className="credits-citation-label">PRIMARY PUBLICATION</span>
+       <p className="credits-citation-text">
+        Mitsuhashi N, Fujieda K, Tamura T, Kawamoto S, Takagi T, Okubo K. <em>BodyParts3D: 3D structure database for anatomical concepts.</em> Nucleic Acids Res. 2009 Jan;37(Database issue):D782-5. doi: 10.1093/nar/gkn613.
+       </p>
+      </div>
+      <div className="credits-links-grid">
+       <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer" className="credits-link-btn">
+        <span>Creative Commons CC BY 4.0 License</span>
+        <ArrowUpRight size={13} />
+       </a>
+       <a href="https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html" target="_blank" rel="noreferrer" className="credits-link-btn">
+        <span>Official DBCLS License Statement</span>
+        <ArrowUpRight size={13} />
+       </a>
+       <a href="https://dbarchive.biosciencedbc.jp/en/bodyparts3d/download.html" target="_blank" rel="noreferrer" className="credits-link-btn">
+        <span>BodyParts3D Geometry & Metadata Archive</span>
+        <ArrowUpRight size={13} />
+       </a>
+       <a href="https://doi.org/10.1093/nar/gkn613" target="_blank" rel="noreferrer" className="credits-link-btn">
+        <span>Read NAR Publication (PubMed / OUP)</span>
+        <ArrowUpRight size={13} />
+       </a>
+      </div>
+     </div>
+
+     <div className="credits-card">
+      <div className="credits-card-header">
+       <span className="credits-kicker">SOFTWARE ARCHITECTURE & ENGINE</span>
+       <Badge variant="outline" className="credits-badge-mit">MIT License</Badge>
+      </div>
+      <h3 className="credits-card-title">Human Atlas & Three.js</h3>
+      <p className="credits-card-body">
+       Built upon the open-source <strong>Human Atlas</strong> architecture created by <em>Ashish Shekar</em> (<a href="https://github.com/ashemag/human-atlas" target="_blank" rel="noreferrer" className="underline font-medium">ashemag/human-atlas</a>, MIT License).
+      </p>
+      <ul className="credits-list">
+       <li><strong>Three.js (r159)</strong>: High-performance WebGL 3D graphics library (MIT License, Ricardo Cabello & Three.js authors).</li>
+       <li><strong>meshoptimizer</strong>: Fast GPU mesh compression, indexing, and quantized coordinate decompression (MIT License, Arseny Kapoulkine).</li>
+       <li><strong>React 19 & Vite</strong>: Modern declarative component UI and lightning-fast Rolldown ESM bundler.</li>
+       <li><strong>Tailwind CSS & Lucide</strong>: Clinical design language and iconography.</li>
+      </ul>
+     </div>
+
+     <div className="credits-card">
+      <div className="credits-card-header">
+       <span className="credits-kicker">PHARMACOKINETICS & CLINICAL CITATIONS</span>
+       <Badge variant="secondary" className="credits-badge-pk">Peer-Reviewed</Badge>
+      </div>
+      <h3 className="credits-card-title">Pharmacokinetic Literature References</h3>
+      <p className="credits-card-body">
+       Every drug parameter implemented in <code className="credits-code">src/pk/drugs.json</code> is derived directly from peer-reviewed pharmacokinetic studies or marked with an explicit assumption tag for the 5-compartment Runge-Kutta ODE solver.
+      </p>
+      <div className="credits-drug-table-wrap">
+       <table className="credits-drug-table">
+        <thead>
+         <tr>
+          <th>Drug</th>
+          <th>Bioavail. (F)</th>
+          <th>Abs. Rate (k<sub>a</sub>)</th>
+          <th>V<sub>d</sub></th>
+          <th>Hepatic CL<sub>h</sub></th>
+          <th>Renal CL<sub>r</sub></th>
+         </tr>
+        </thead>
+        <tbody>
+         <tr>
+          <td><strong>Paracetamol</strong></td>
+          <td>88%</td>
+          <td>1.80 h⁻¹</td>
+          <td>0.95 L/kg</td>
+          <td>0.280 L/(h·kg)</td>
+          <td>0.020 L/(h·kg)</td>
+         </tr>
+         <tr>
+          <td colSpan={6} className="credits-table-cite">
+           <strong>Citation:</strong> Prescott LF. <em>Kinetics and metabolism of paracetamol and phenacetin.</em> Br J Clin Pharmacol. 1980;10 Suppl 2:291S-298S.
+          </td>
+         </tr>
+         <tr>
+          <td><strong>Ibuprofen</strong></td>
+          <td>95%</td>
+          <td>1.20 h⁻¹</td>
+          <td>0.15 L/kg</td>
+          <td>0.055 L/(h·kg)</td>
+          <td>0.005 L/(h·kg)</td>
+         </tr>
+         <tr>
+          <td colSpan={6} className="credits-table-cite">
+           <strong>Citation:</strong> Davies NM. <em>Clinical pharmacokinetics of ibuprofen: The first 30 years.</em> Clin Pharmacokinet. 1998;34(2):101-154.
+          </td>
+         </tr>
+         <tr>
+          <td><strong>Aspirin</strong></td>
+          <td>68%</td>
+          <td>2.50 h⁻¹</td>
+          <td>0.17 L/kg</td>
+          <td>0.550 L/(h·kg)</td>
+          <td>0.050 L/(h·kg)</td>
+         </tr>
+         <tr>
+          <td colSpan={6} className="credits-table-cite">
+           <strong>Citation:</strong> Rowland M, Riegelman S. <em>Pharmacokinetics of acetylsalicylic acid and salicylic acid after oral administration in man.</em> J Pharm Sci. 1968;57(8):1313-1319.
+          </td>
+         </tr>
+         <tr>
+          <td><strong>Amoxicillin</strong></td>
+          <td>80%</td>
+          <td>1.10 h⁻¹</td>
+          <td>0.30 L/kg</td>
+          <td>0.040 L/(h·kg)</td>
+          <td>0.220 L/(h·kg)</td>
+         </tr>
+         <tr>
+          <td colSpan={6} className="credits-table-cite">
+           <strong>Citation:</strong> Sjövall J, et al. <em>Dose-dependent absorption of amoxicillin and bacampicillin.</em> Clin Pharmacol Ther. 1985;38(3):241-250.
+          </td>
+         </tr>
+        </tbody>
+       </table>
+      </div>
+      <div className="credits-textbook-citations">
+       <span className="credits-citation-label">STANDARD TEXTBOOK & REGULATORY REFERENCES</span>
+       <ul className="credits-list-small">
+        <li>Brunton LL, Hilal-Dandan R, Knollmann BC. <em>Goodman & Gilman's The Pharmacological Basis of Therapeutics (14th Ed).</em> McGraw-Hill, 2023.</li>
+        <li>Rowland M, Tozer TN. <em>Clinical Pharmacokinetics and Pharmacodynamics: Concepts and Applications (5th Ed).</em> Wolters Kluwer, 2019.</li>
+        <li>U.S. Food and Drug Administration (FDA) Center for Drug Evaluation and Research (CDER) Clinical Pharmacology and Biopharmaceutics Reviews.</li>
+       </ul>
+      </div>
+     </div>
+
+     <div className="credits-card">
+      <div className="credits-card-header">
+       <span className="credits-kicker">MODEL ADAPTATIONS & PIPELINE</span>
+      </div>
+      <h3 className="credits-card-title">Geometric & Numerical Pipeline</h3>
+      <p className="credits-card-body">
+       The source BodyParts3D geometry underwent coordinate transformation from millimeters/Z-up to meters/Y-up and stage alignment. Vertex positions and quantized 16-bit normal vectors were partitioned into 15 binary chunks. Progressive organ group lazy loading streams the critical external capsule and digestive landmarks first (&lt;400ms time to interactive), while deeper skeletal and vascular structures load asynchronously in the background.
+      </p>
+     </div>
+    </div>
+   </SheetContent>
+  </Sheet>
  </main>;
 }

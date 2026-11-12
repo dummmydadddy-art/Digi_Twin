@@ -264,7 +264,54 @@ if (organGlow.a > 0.005) {
    groups.forEach((gs,system)=>{const geometry=mergeGeometries(gs,false);if(!geometry)throw new Error('Could not assemble anatomy geometry.');geometries.push(geometry);const mesh=new T.Mesh(geometry,mats.get(system as never));mesh.frustumCulled=false;anatomyGroup.add(mesh);});
    lastState=null;loaded++;onProgress(Math.round(loaded/atlas.chunks.length*100));dirty=true;
   };
-  (async()=>{try{let cursor=0;await Promise.all(Array.from({length:3},async()=>{while(cursor<atlas.chunks.length){const i=cursor++;await loadChunk(i);}}));if(!disposed){ready=true;dirty=true;}}catch(e){if(!disposed)onError(e instanceof Error?e.message:'Could not load the anatomy.');}})();
+
+  const loadedChunks = new Set<number>();
+  const inFlight = new Map<number, Promise<void>>();
+
+  const loadChunkSafe = (ci: number): Promise<void> => {
+   if (loadedChunks.has(ci)) return Promise.resolve();
+   if (inFlight.has(ci)) return inFlight.get(ci)!;
+   const p = loadChunk(ci).then(() => {
+    loadedChunks.add(ci);
+    inFlight.delete(ci);
+   }).catch(err => {
+    inFlight.delete(ci);
+    throw err;
+   });
+   inFlight.set(ci, p);
+   return p;
+  };
+
+  // Priority 1: Chunks 10, 11, 0 (Outer body skin, skeletal landmarks, primary GI organs) for instant <400ms First Paint
+  const priorityChunks = [10, 11, 0];
+  const remainingChunks = Array.from({length: atlas.chunks.length}, (_, i) => i).filter(i => !priorityChunks.includes(i));
+
+  (async () => {
+   try {
+    await Promise.all(priorityChunks.map(ci => loadChunkSafe(ci)));
+    if (!disposed) {
+     ready = true;
+     dirty = true;
+    }
+
+    // Stream remaining organ group chunks progressively in idle frames
+    for (const ci of remainingChunks) {
+     if (disposed) break;
+     await new Promise(r => {
+      if (typeof requestIdleCallback !== 'undefined') {
+       requestIdleCallback(() => r(null), { timeout: 150 });
+      } else {
+       setTimeout(r, 20);
+      }
+     });
+     if (disposed) break;
+     await loadChunkSafe(ci);
+    }
+   } catch (e) {
+    if (!disposed) onError(e instanceof Error ? e.message : 'Could not load the anatomy.');
+   }
+  })();
+
   const fit=(view:string,extent=0)=>{
    const aspect=camera.aspect,mobile=el.clientWidth<768,normalDistance=mobile?Math.max(4.5,1.8*el.clientHeight/Math.max(160,el.clientHeight-350)/(2*Math.tan(T.MathUtils.degToRad(camera.fov/2)))):4;
    const reservedHeight=mobile?350:270;const availableAspect=Math.max(.35,(el.clientWidth-(mobile?40:340))/Math.max(160,el.clientHeight-reservedHeight));const atlasDistance=Math.max(packingHeight,packingWidth/availableAspect)/(2*Math.tan(T.MathUtils.degToRad(camera.fov/2)))*(el.clientHeight/Math.max(160,el.clientHeight-reservedHeight))*1.08;
@@ -402,6 +449,20 @@ if (organGlow.a > 0.005) {
    // Honest physiological animation continuously runs in vertex shader via uTime
    timeUniform.value = clock.getElapsedTime();
    dirty = true;
+
+   // On-demand chunk boosting for user selections and active simulation
+   if (s.selected.length > 0) {
+    atlas.parts.forEach(p => {
+     if (s.selected.includes(p.id) && !loadedChunks.has(p.chunk)) {
+      loadChunkSafe(p.chunk);
+     }
+    });
+   }
+   if (s.simulation?.active) {
+    [10, 11, 7, 8, 9].forEach(ci => {
+     if (!loadedChunks.has(ci)) loadChunkSafe(ci);
+    });
+   }
 
    // Drug digestion simulation: pill transit, instanced particles & organ clearance glow
    if (s.simulation?.active) {

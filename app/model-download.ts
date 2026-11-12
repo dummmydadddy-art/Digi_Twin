@@ -1,3 +1,16 @@
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+
+export { MeshoptDecoder };
+
+/**
+ * Initializes the Meshopt WebAssembly decoder if not already active.
+ */
+export async function initMeshoptDecoder(): Promise<void> {
+ if (MeshoptDecoder && !MeshoptDecoder.supported) {
+  await MeshoptDecoder.ready;
+ }
+}
+
 /** Static hosts may serve .gz as a compressed response or as a gzip file.
  * Fetch already decodes Content-Encoding; inspect the payload to avoid decoding twice.
  */
