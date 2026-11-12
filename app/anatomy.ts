@@ -197,6 +197,86 @@ export interface SceneState {
  view: View;
  rotate: boolean;
  reset: number;
+ patient?: PatientProfile;
+}
+
+export type Sex = 'male' | 'female';
+export type BloodGroup = 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-' | 'O+' | 'O-';
+export type DrugAllergy = 'none' | 'penicillin' | 'nsaids' | 'sulfonamides';
+
+export interface PatientProfile {
+ sex: Sex;
+ age: number;       // 18 - 90
+ heightCm: number;  // 135 - 210
+ weightKg: number;  // 40 - 140
+ bloodGroup: BloodGroup;
+ allergy: DrugAllergy;
+}
+
+export const DEFAULT_PATIENT_PROFILE: PatientProfile = {
+ sex: 'male',
+ age: 30,
+ heightCm: 175,
+ weightKg: 70,
+ bloodGroup: 'O+',
+ allergy: 'none',
+};
+
+export interface AnatomicalScale {
+ scaleX: number; // Lateral girth (width)
+ scaleY: number; // Vertical height
+ scaleZ: number; // Anteroposterior girth (depth)
+ bmi: number;
+ bmiCategory: 'Underweight' | 'Normal' | 'Overweight' | 'Obese';
+ bsa: number; // Mosteller formula: sqrt(H * W / 3600)
+ tbwLiters: number; // Total body water estimate for Vd
+ crClMlMin: number; // Cockcroft-Gault creatinine clearance proxy
+}
+
+export function computeAnatomicalScale(p: PatientProfile = DEFAULT_PATIENT_PROFILE): AnatomicalScale {
+ const heightM = Math.max(1.2, Math.min(2.2, p.heightCm / 100));
+ const weight = Math.max(35, Math.min(160, p.weightKg));
+ const age = Math.max(18, Math.min(95, p.age));
+
+ // Height scaling along Y
+ const baseScaleY = p.heightCm / 175.0;
+ const ageHeightFactor = 1.0 - Math.max(0, age - 40) * 0.0006;
+ const sexHeightFactor = p.sex === 'female' ? 0.985 : 1.0;
+ const scaleY = Math.max(0.75, Math.min(1.25, baseScaleY * ageHeightFactor * sexHeightFactor));
+
+ // Girth scaling from BMI and Weight
+ const bmi = weight / (heightM * heightM);
+ const refBmi = 22.857; // standard male 70kg / (1.75m)^2
+ const baseGirth = Math.sqrt(Math.max(0.5, Math.min(2.5, bmi / refBmi)));
+
+ // Age & Sex adjustments to girth proportions
+ const ageGirthFactor = 1.0 + Math.min(0.08, Math.max(0, age - 30) * 0.0012);
+ const sexXFactor = p.sex === 'female' ? 0.96 : 1.0;
+ const sexZFactor = p.sex === 'female' ? 1.04 : 1.0;
+
+ const scaleX = Math.max(0.70, Math.min(1.45, baseGirth * ageGirthFactor * sexXFactor));
+ const scaleZ = Math.max(0.70, Math.min(1.45, baseGirth * ageGirthFactor * sexZFactor));
+
+ const bmiCategory: AnatomicalScale['bmiCategory'] =
+  bmi < 18.5 ? 'Underweight' : bmi < 25 ? 'Normal' : bmi < 30 ? 'Overweight' : 'Obese';
+
+ const bsa = Math.sqrt((p.heightCm * weight) / 3600.0);
+ const tbwFraction = (p.sex === 'female' ? 0.50 : 0.60) * (1.0 - (age - 20) * 0.0015);
+ const tbwLiters = weight * Math.max(0.40, tbwFraction);
+
+ const rawCrCl = ((140 - age) * weight) / (72 * 1.0);
+ const crClMlMin = p.sex === 'female' ? rawCrCl * 0.85 : rawCrCl;
+
+ return {
+  scaleX,
+  scaleY,
+  scaleZ,
+  bmi,
+  bmiCategory,
+  bsa,
+  tbwLiters,
+  crClMlMin,
+ };
 }
 
 export const DEFAULT_VISIBLE: SystemId[] = ['integumentary','cardiac','sensory','skeletal','muscular','arterial','venous','nervous','respiratory','digestive','urinary','lymphatic','endocrine','reproductive','connective'];

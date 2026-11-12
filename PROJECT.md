@@ -179,11 +179,24 @@ BodyParts3D distinguishes between **Parts** (individual raw 3D mesh objects in t
 - [x] Escape key resets camera and dismisses detail panel.
 - [x] Verified in browser with 4 high-resolution screenshots.
 
-### Phase 4: Patient Profile Panel & Morphological Scaling (Next Phase)
-- [ ] Add Patient Panel: Sex, Age, Height (cm), Weight (kg), Blood Group, Drug Allergy.
-- [ ] Dynamic scaling of anatomical model (height Y, girth X/Z) with label noting adult male reference approximation.
+### Phase 4: Patient Profile Panel & Morphological Scaling (Completed)
+- [x] Typed patient data structures (`PatientProfile`, `Sex`, `BloodGroup`, `DrugAllergy`) stored in application state and ready for consumption by Phase 5 PK engine.
+- [x] Morphological scale engine:
+  - Height scales along Y axis ($135\text{ cm} - 210\text{ cm}$, reference $175\text{ cm}$).
+  - Weight scales torso and abdominal girth along X and Z axes from BMI ($40\text{ kg} - 140\text{ kg}$, reference $70\text{ kg}$).
+  - Sensible geometric clamps prevent unnatural distortion ($0.70\times$ to $1.45\times$).
+  - Biological sex and age subtly adjust frame proportions: female gracile frame ($0.96\times$ shoulder, $1.04\times$ pelvic girth), age-related disc compression ($0.06\%/\text{year}$ after 40), and midriff expansion.
+- [x] Derived pharmacokinetic parameters computed dynamically:
+  - BMI with clinical categorization (Underweight, Normal, Overweight, Obese).
+  - Mosteller Body Surface Area (BSA).
+  - Total Body Water (TBW via Watson formula) for volume of distribution ($V_d$) scaling.
+  - Estimated Creatinine Clearance (eCrCl via Cockcroft-Gault) for renal clearance ($k_e$) modulation.
+- [x] Educational approximation notice prominently displayed in patient sheet and in the 3D scene caption (`"30YO MALE · 175CM · 70KG · APPROXIMATION"`).
+- [x] Interactive Patient Profile sheet with live sliders, blood group selectors, and documented drug allergy flags with hypersensitivity warning alert.
+- [x] 3D anatomy root group, raycaster bounding boxes, and camera pivot target dynamically synced with scale factors.
+- [x] Verified in browser with 5 automated screenshot checkpoints.
 
-### Phase 5: Pharmacokinetics & Drug Simulation Engine
+### Phase 5: Pharmacokinetics & Drug Simulation Engine (Next Phase)
 - [ ] Sourced drug library (Paracetamol, Ibuprofen, Aspirin, Amoxicillin) with explicit parameter citations.
 - [ ] Oral ingestion path animation: mouth > esophagus > stomach > small intestine > bloodstream.
 - [ ] Real-time one-compartment PK differential solver with liver clearance & renal excretion visual highlights.

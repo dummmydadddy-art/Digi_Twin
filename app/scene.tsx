@@ -6,7 +6,7 @@ import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {createExplosionLayout} from './explosion-layout';
 import {decodeModelResponse} from './model-download';
 import {PointerTap} from './pointer-tap';
-import {SYSTEMS,type Atlas,type SceneState,type SystemId,getSystemTier} from './anatomy';
+import {SYSTEMS,type Atlas,type SceneState,type SystemId,getSystemTier,computeAnatomicalScale} from './anatomy';
 
 interface Props {
  atlas:Atlas;
@@ -47,7 +47,8 @@ export default function AnatomyScene({atlas,state,onSelect,onPeelChange,onProgre
   const markerPositions=new Float32Array(atlas.parts.length*3),markerGeometry=new T.BufferGeometry();markerGeometry.setAttribute('position',new T.BufferAttribute(markerPositions,3));
   const markerMaterial=new T.PointsMaterial({color:0x64748b,size:5,sizeAttenuation:false,transparent:true,opacity:.72,depthTest:false});
   markerMaterial.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>','#include <clipping_planes_fragment>\nif (distance(gl_PointCoord, vec2(0.5)) > 0.5) discard;');};
-  const markers=new T.Points(markerGeometry,markerMaterial);markers.frustumCulled=false;markers.renderOrder=10;markers.visible=false;scene.add(markers);
+  const anatomyGroup=new T.Group();scene.add(anatomyGroup);
+  const markers=new T.Points(markerGeometry,markerMaterial);markers.frustumCulled=false;markers.renderOrder=10;markers.visible=false;anatomyGroup.add(markers);
   const hover=document.createElement('div');hover.className='part-hover';hover.setAttribute('role','tooltip');hover.hidden=true;el.appendChild(hover);
   type Target={index:number;x:number;y:number;left:number;right:number;top:number;bottom:number};let targets:Target[]=[];
   const projected=new T.Vector3();
@@ -166,20 +167,21 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.85, 0.78), partSelected * 
     if(p.chunk!==ci)return;
     const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(new Float32Array(buffer,p.positions,p.vertexCount*3),3));
     g.setAttribute('normal',new T.BufferAttribute(new Int16Array(buffer,p.normals,p.vertexCount*3),3,true));g.setIndex(new T.BufferAttribute(new Uint32Array(buffer,p.indices,p.indexCount),1));
-    g.boundingBox=bounds[i].clone();g.computeBoundingSphere();const pick=new T.Mesh(g);pick.matrixAutoUpdate=false;pickers[i]=pick;geometries.push(g);
+    g.boundingBox=bounds[i].clone();g.computeBoundingSphere();const pick=new T.Mesh(g);pick.matrixAutoUpdate=false;pickers[i]=pick;geometries.push(g);anatomyGroup.add(pick);
     g.setAttribute('partIndex',new T.BufferAttribute(new Float32Array(p.vertexCount).fill(i),1));
     const list=groups.get(p.system)??[];list.push(g);groups.set(p.system,list);
    });
-   groups.forEach((gs,system)=>{const geometry=mergeGeometries(gs,false);if(!geometry)throw new Error('Could not assemble anatomy geometry.');geometries.push(geometry);const mesh=new T.Mesh(geometry,mats.get(system as never));mesh.frustumCulled=false;scene.add(mesh);});
+   groups.forEach((gs,system)=>{const geometry=mergeGeometries(gs,false);if(!geometry)throw new Error('Could not assemble anatomy geometry.');geometries.push(geometry);const mesh=new T.Mesh(geometry,mats.get(system as never));mesh.frustumCulled=false;anatomyGroup.add(mesh);});
    lastState=null;loaded++;onProgress(Math.round(loaded/atlas.chunks.length*100));dirty=true;
   };
   (async()=>{try{let cursor=0;await Promise.all(Array.from({length:3},async()=>{while(cursor<atlas.chunks.length){const i=cursor++;await loadChunk(i);}}));if(!disposed){ready=true;dirty=true;}}catch(e){if(!disposed)onError(e instanceof Error?e.message:'Could not load the anatomy.');}})();
   const fit=(view:string,extent=0)=>{
    const aspect=camera.aspect,mobile=el.clientWidth<768,normalDistance=mobile?Math.max(4.5,1.8*el.clientHeight/Math.max(160,el.clientHeight-350)/(2*Math.tan(T.MathUtils.degToRad(camera.fov/2)))):4;
    const reservedHeight=mobile?350:270;const availableAspect=Math.max(.35,(el.clientWidth-(mobile?40:340))/Math.max(160,el.clientHeight-reservedHeight));const atlasDistance=Math.max(packingHeight,packingWidth/availableAspect)/(2*Math.tan(T.MathUtils.degToRad(camera.fov/2)))*(el.clientHeight/Math.max(160,el.clientHeight-reservedHeight))*1.08;
-   const distance=T.MathUtils.lerp(normalDistance,Math.max(.2,atlasDistance),extent);if(extent>.8)view='front';
+   const sy=anatomyGroup.scale.y||1;
+   const distance=T.MathUtils.lerp(normalDistance*Math.max(.85,sy),Math.max(.2,atlasDistance),extent);if(extent>.8)view='front';
    const direction=view==='front'?new T.Vector3(0,.02,1):view==='back'?new T.Vector3(0,.02,-1):view==='side'?new T.Vector3(1,.02,0):new T.Vector3(.35,.06,1).normalize();
-   const targetY=extent>.1?.85:.88;const targetX=extent>.1&&el.clientWidth>767?-packingWidth*.12:0;controls.target.set(targetX,targetY,0);camera.position.copy(controls.target).addScaledVector(direction,distance);controls.update();dirty=true;
+   const targetY=extent>.1?.85*sy:.88*sy;const targetX=extent>.1&&el.clientWidth>767?-packingWidth*.12:0;controls.target.set(targetX,targetY,0);camera.position.copy(controls.target).addScaledVector(direction,distance);controls.update();dirty=true;
   };
   const resize=()=>{layoutKey='';lastState=null;renderer.setPixelRatio(Math.min(devicePixelRatio,el.clientWidth<768||el.clientHeight<600?1.5:2));camera.aspect=el.clientWidth/el.clientHeight;camera.updateProjectionMatrix();renderer.setSize(el.clientWidth,el.clientHeight);fit(latest.current.view,amount);};const observer=new ResizeObserver(resize);observer.observe(el);
   const raycaster=new T.Raycaster(),pointer=new T.Vector2(),tap=new PointerTap(),worldBox=new T.Box3(),hitPoint=new T.Vector3();
@@ -200,7 +202,8 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.85, 0.78), partSelected * 
     if(currentPeel>.25&&tier===0)return;
     if(currentPeel>.52&&tier===1)return;
     if(currentPeel>.76&&tier===2)return;
-    worldBox.copy(bounds[i]).translate(mesh.position);
+    worldBox.min.copy(bounds[i].min).add(mesh.position).multiply(anatomyGroup.scale);
+    worldBox.max.copy(bounds[i].max).add(mesh.position).multiply(anatomyGroup.scale);
     if(!raycaster.ray.intersectBox(worldBox,hitPoint))return;
     const hits=raycaster.intersectObject(mesh,false);
     if(hits[0]){
@@ -227,7 +230,8 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.85, 0.78), partSelected * 
     if(currentPeel>.25&&tier===0)return;
     if(currentPeel>.52&&tier===1)return;
     if(currentPeel>.76&&tier===2)return;
-    worldBox.copy(bounds[i]).translate(mesh.position);
+    worldBox.min.copy(bounds[i].min).add(mesh.position).multiply(anatomyGroup.scale);
+    worldBox.max.copy(bounds[i].max).add(mesh.position).multiply(anatomyGroup.scale);
     if(!raycaster.ray.intersectBox(worldBox,hitPoint))return;
     const hits=raycaster.intersectObject(mesh,false);
     if(hits[0]){
@@ -239,9 +243,9 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.85, 0.78), partSelected * 
    if(found>=0){
     hover.hidden=true;
     select.current(atlas.parts[found].id);
-    const organCenter=centers[found];
-    focusCenterUniform.value.copy(organCenter);
-    const size=bounds[found].getSize(new T.Vector3());
+    const organCenter = centers[found].clone().multiply(anatomyGroup.scale);
+     focusCenterUniform.value.copy(organCenter);
+     const size = bounds[found].getSize(new T.Vector3()).multiply(anatomyGroup.scale);
     const maxDim=Math.max(size.x,size.y,size.z,.08);
     const viewDir=new T.Vector3().subVectors(camera.position,controls.target).normalize();
     const focusDist=Math.max(.35,maxDim/(2*Math.tan(T.MathUtils.degToRad(camera.fov/2)))*1.65);
@@ -268,7 +272,8 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.85, 0.78), partSelected * 
     if(currentPeel>.25&&tier===0)return;
     if(currentPeel>.52&&tier===1)return;
     if(currentPeel>.76&&tier===2)return;
-    worldBox.copy(bounds[i]).translate(mesh.position);
+    worldBox.min.copy(bounds[i].min).add(mesh.position).multiply(anatomyGroup.scale);
+    worldBox.max.copy(bounds[i].max).add(mesh.position).multiply(anatomyGroup.scale);
     if(!raycaster.ray.intersectBox(worldBox,hitPoint))return;
     const hits=raycaster.intersectObject(mesh,false);
     if(hits[0]){
@@ -282,8 +287,8 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.85, 0.78), partSelected * 
    if(bestIndex>=0){targetPeelCenter.copy(rayHitPoint);targetPeelRadius=.38;}
    else if(nextPeel<=.05){targetPeelRadius=0;}
    const viewDir=new T.Vector3().subVectors(camera.position,controls.target).normalize();
-   const baseTarget=new T.Vector3(0,.88,0);
-   const organTarget=bestIndex>=0?centers[bestIndex]:controls.target;
+   const baseTarget = new T.Vector3(0, .88 * (anatomyGroup.scale.y || 1), 0);
+   const organTarget = bestIndex >= 0 ? centers[bestIndex].clone().multiply(anatomyGroup.scale) : controls.target;
    const targetLook=new T.Vector3().lerpVectors(baseTarget,organTarget,nextPeel);
    const baseDist=3.4;
    const size=bestIndex>=0?bounds[bestIndex].getSize(new T.Vector3()):new T.Vector3(.3,.3,.3);
@@ -305,14 +310,36 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.85, 0.78), partSelected * 
    if(moving){amount=T.MathUtils.damp(amount,s.explode,8,dt);dirty=true;}
 
    // Honest physiological animation continuously runs in vertex shader via uTime
-   timeUniform.value=clock.getElapsedTime();
-   dirty=true;
+   timeUniform.value = clock.getElapsedTime();
+   dirty = true;
 
-   // Update cutaway center and state
-   if(s.selected.length>0){
-    const box=new T.Box3();
-    atlas.parts.forEach((p,i)=>{if(s.selected.includes(p.id))box.union(bounds[i]);});
-    if(!box.isEmpty()){focusCenterUniform.value.copy(box.getCenter(new T.Vector3()));}
+   // Morphological scaling matching patient profile
+   const patientScale = computeAnatomicalScale(s.patient);
+   const prevScaleY = anatomyGroup.scale.y;
+   anatomyGroup.scale.x = T.MathUtils.damp(anatomyGroup.scale.x, patientScale.scaleX, 8, dt);
+   anatomyGroup.scale.y = T.MathUtils.damp(anatomyGroup.scale.y, patientScale.scaleY, 8, dt);
+   anatomyGroup.scale.z = T.MathUtils.damp(anatomyGroup.scale.z, patientScale.scaleZ, 8, dt);
+   if (Math.abs(anatomyGroup.scale.y - prevScaleY) > 0.0002) {
+    anatomyGroup.updateMatrixWorld(true);
+    dirty = true;
+   }
+   const pedScale = Math.max(1, anatomyGroup.scale.x * 1.05);
+   platform.scale.set(pedScale, 1, Math.max(1, anatomyGroup.scale.z * 1.05));
+   ring.scale.set(pedScale, Math.max(1, anatomyGroup.scale.z * 1.05), 1);
+   innerRing.scale.set(pedScale, Math.max(1, anatomyGroup.scale.z * 1.05), 1);
+
+   // Update cutaway center and state with scaled bounds
+   if (s.selected.length > 0) {
+    const box = new T.Box3();
+    atlas.parts.forEach((p, i) => {
+     if (s.selected.includes(p.id)) {
+      const pBox = bounds[i].clone();
+      pBox.min.multiply(anatomyGroup.scale);
+      pBox.max.multiply(anatomyGroup.scale);
+      box.union(pBox);
+     }
+    });
+    if (!box.isEmpty()) { focusCenterUniform.value.copy(box.getCenter(new T.Vector3())); }
    }
    cutawayUniform.value=s.cutaway&&s.selected.length>0?1.0:0.0;
 
@@ -349,7 +376,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.85, 0.78), partSelected * 
    }
    if(s.view!==lastView||s.reset!==lastReset){
     if(s.reset!==lastReset){
-     targetPeel=0;targetPeelRadius=0;targetPeelCenter.set(0,.88,0);flyingTo=null;peelChange.current?.(0);
+     targetPeel=0;targetPeelRadius=0;targetPeelCenter.set(0, .88 * (anatomyGroup.scale.y || 1), 0);flyingTo=null;peelChange.current?.(0);
     }
     fit(s.view,amount);lastView=s.view;lastReset=s.reset;
    }
