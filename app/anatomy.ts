@@ -186,6 +186,16 @@ export function getOrganDossier(name: string): OrganDossier | null {
  return null;
 }
 
+export interface SimulationVisualState {
+ active: boolean;
+ progress: number;       // 0.0 to 1.0 (transit along gastrointestinal spline)
+ stomachLevel: number;   // 0.0 to 1.0 relative stomach residue
+ gutLevel: number;       // 0.0 to 1.0 relative intestinal lumen amount
+ plasmaLevel: number;    // 0.0 to 1.0 relative systemic plasma concentration
+ liverIntensity: number; // 0.0 to 1.0 instantaneous hepatic metabolic load
+ kidneyIntensity: number;// 0.0 to 1.0 instantaneous renal excretion load
+}
+
 export interface SceneState {
  inspectorOpen?: boolean;
  explode: number;
@@ -198,6 +208,7 @@ export interface SceneState {
  rotate: boolean;
  reset: number;
  patient?: PatientProfile;
+ simulation?: SimulationVisualState;
 }
 
 export type Sex = 'male' | 'female';

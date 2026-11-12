@@ -41,6 +41,7 @@ export default function AnatomyScene({atlas,state,onSelect,onPeelChange,onProgre
   const innerRing=new T.Mesh(new T.RingGeometry(.55,.551,128),new T.MeshBasicMaterial({color:0xa4aeb8,transparent:true,opacity:.16,side:T.DoubleSide}));innerRing.rotation.x=-Math.PI/2;innerRing.position.y=.001;scene.add(innerRing);
   const width=T.MathUtils.ceilPowerOfTwo(atlas.parts.length),data=new Float32Array(width*4),partTexture=new T.DataTexture(data,width,1,T.RGBAFormat,T.FloatType);partTexture.needsUpdate=true;
   const selectedData=new Uint8Array(width*4),selectionTexture=new T.DataTexture(selectedData,width,1);selectionTexture.needsUpdate=true;
+  const glowData=new Uint8Array(width*4),glowTexture=new T.DataTexture(glowData,width,1);glowTexture.needsUpdate=true;
   const materials:T.Material[]=[],geometries:T.BufferGeometry[]=[],pickers:(T.Mesh|undefined)[]=[],centers=atlas.parts.map(p=>new T.Vector3().fromArray(p.bounds[0]).add(new T.Vector3().fromArray(p.bounds[1])).multiplyScalar(.5));
   const offsets:T.Vector3[]=[],bounds=atlas.parts.map(p=>new T.Box3(new T.Vector3().fromArray(p.bounds[0]),new T.Vector3().fromArray(p.bounds[1])));
   let packingWidth=1,packingHeight=1;
@@ -49,6 +50,38 @@ export default function AnatomyScene({atlas,state,onSelect,onPeelChange,onProgre
   markerMaterial.onBeforeCompile=shader=>{shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>','#include <clipping_planes_fragment>\nif (distance(gl_PointCoord, vec2(0.5)) > 0.5) discard;');};
   const anatomyGroup=new T.Group();scene.add(anatomyGroup);
   const markers=new T.Points(markerGeometry,markerMaterial);markers.frustumCulled=false;markers.renderOrder=10;markers.visible=false;anatomyGroup.add(markers);
+
+  // Ingestion spline: oral cavity -> pharynx -> esophagus -> stomach -> duodenum -> jejunum -> ileum
+  const ingestionWaypoints = [
+   new T.Vector3(0.000, 1.520, 0.055),
+   new T.Vector3(0.003, 1.440, 0.025),
+   new T.Vector3(0.005, 1.350, 0.000),
+   new T.Vector3(0.007, 1.270, -0.005),
+   new T.Vector3(0.015, 1.200, 0.015),
+   new T.Vector3(0.038, 1.150, 0.038),
+   new T.Vector3(0.010, 1.110, 0.035),
+   new T.Vector3(-0.017, 1.080, 0.030),
+   new T.Vector3(-0.010, 1.020, 0.045),
+   new T.Vector3(0.015, 0.950, 0.050)
+  ];
+  const ingestionCurve = new T.CatmullRomCurve3(ingestionWaypoints, false, 'centripetal');
+  const pillGroup = new T.Group();
+  const pillCore = new T.Mesh(new T.SphereGeometry(0.014, 16, 16), new T.MeshStandardMaterial({color:0x38bdf8,emissive:0x0284c7,emissiveIntensity:1.6,roughness:0.2}));
+  const pillHalo = new T.Mesh(new T.SphereGeometry(0.025, 16, 16), new T.MeshBasicMaterial({color:0x7dd3fc,transparent:true,opacity:0.45,depthWrite:false}));
+  pillGroup.add(pillCore);pillGroup.add(pillHalo);pillGroup.visible=false;
+  anatomyGroup.add(pillGroup);
+
+  const liverPartIndices = new Set<number>();
+  const kidneyPartIndices = new Set<number>();
+  const stomachPartIndices = new Set<number>();
+  const gutPartIndices = new Set<number>();
+  atlas.parts.forEach((p, idx) => {
+   const name = p.name.toLowerCase();
+   if (name.includes('liver') || p.conceptId === 'FMA7197') liverPartIndices.add(idx);
+   if (name.includes('kidney') || p.conceptId === 'FMA7203') kidneyPartIndices.add(idx);
+   if (name.includes('stomach') || p.conceptId === 'FMA7148') stomachPartIndices.add(idx);
+   if (name.includes('duodenum') || name.includes('jejunum') || name.includes('ileum') || p.conceptId === 'FMA7200') gutPartIndices.add(idx);
+  });
   const hover=document.createElement('div');hover.className='part-hover';hover.setAttribute('role','tooltip');hover.hidden=true;el.appendChild(hover);
   type Target={index:number;x:number;y:number;left:number;right:number;top:number;bottom:number};let targets:Target[]=[];
   const projected=new T.Vector3();
@@ -70,12 +103,12 @@ export default function AnatomyScene({atlas,state,onSelect,onPeelChange,onProgre
    const motionType=system==='cardiac'?1.0:system==='respiratory'?2.0:system==='digestive'?3.0:0.0;
    const m=new T.MeshStandardMaterial({color:SYSTEMS.find(s=>s.id===system)?.color??'#aebbb8',metalness:.08,roughness:.53,side:T.DoubleSide,transparent:isSkin,opacity:isSkin?.88:1,depthWrite:true});
    m.onBeforeCompile=shader=>{
-    shader.uniforms.partState={value:partTexture};shader.uniforms.selectionState={value:selectionTexture};shader.uniforms.stateWidth={value:width};
+    shader.uniforms.partState={value:partTexture};shader.uniforms.selectionState={value:selectionTexture};shader.uniforms.glowState={value:glowTexture};shader.uniforms.stateWidth={value:width};
     shader.uniforms.uPeel=peelUniform;shader.uniforms.uPeelCenter=peelCenterUniform;shader.uniforms.uPeelRadius=peelRadiusUniform;shader.uniforms.uTier={value:tier};
     shader.uniforms.uTime=timeUniform;shader.uniforms.uMotionType={value:motionType};
     shader.uniforms.uCutawayEnabled=cutawayUniform;shader.uniforms.uFocusCenter=focusCenterUniform;
 
-    shader.vertexShader='attribute float partIndex; uniform sampler2D partState; uniform sampler2D selectionState; uniform float stateWidth; uniform float uTime; uniform float uMotionType; varying float partVisible; varying float partSelected; varying vec3 vWorldPosition;\n'+shader.vertexShader;
+    shader.vertexShader='attribute float partIndex; uniform sampler2D partState; uniform sampler2D selectionState; uniform float stateWidth; uniform float uTime; uniform float uMotionType; varying float partVisible; varying float partSelected; varying vec3 vWorldPosition; varying vec2 vStateUv;\n'+shader.vertexShader;
     shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
 vec2 stateUv = vec2((partIndex + 0.5) / stateWidth, 0.5);
 vec4 state = texture2D(partState, stateUv);
@@ -97,9 +130,10 @@ if (uMotionType > 0.5 && uMotionType < 1.5) {
 
 partVisible = state.w;
 partSelected = texture2D(selectionState, stateUv).r;
+vStateUv = stateUv;
 vWorldPosition = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
 
-    shader.fragmentShader='varying float partVisible; varying float partSelected; varying vec3 vWorldPosition;\nuniform float uPeel; uniform vec3 uPeelCenter; uniform float uPeelRadius; uniform float uTier; uniform float uCutawayEnabled; uniform vec3 uFocusCenter;\n'+shader.fragmentShader;
+    shader.fragmentShader='varying float partVisible; varying float partSelected; varying vec3 vWorldPosition; varying vec2 vStateUv;\nuniform float uPeel; uniform vec3 uPeelCenter; uniform float uPeelRadius; uniform float uTier; uniform float uCutawayEnabled; uniform vec3 uFocusCenter;\nuniform sampler2D glowState;\n'+shader.fragmentShader;
     shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>',`#include <clipping_planes_fragment>
 if (partVisible < 0.5) discard;
 
@@ -154,7 +188,26 @@ if (uCutawayEnabled > 0.5 && partSelected > 0.5) {
  }
 }
 
-diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.85, 0.78), partSelected * 0.75);`);
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.85, 0.78), partSelected * 0.75);
+
+// Pharmacokinetic organ clearance and gastrointestinal transit illumination
+vec4 organGlow = texture2D(glowState, vStateUv);
+if (organGlow.r > 0.005) {
+ vec3 hepaticGlow = vec3(0.98, 0.62, 0.16); // Golden-amber liver metabolic clearance
+ diffuseColor.rgb = mix(diffuseColor.rgb, hepaticGlow, organGlow.r * 0.85);
+}
+if (organGlow.g > 0.005) {
+ vec3 renalGlow = vec3(0.18, 0.84, 0.96); // Vibrant cyan kidney excretion filtration
+ diffuseColor.rgb = mix(diffuseColor.rgb, renalGlow, organGlow.g * 0.85);
+}
+if (organGlow.b > 0.005) {
+ vec3 gastroGlow = vec3(0.96, 0.82, 0.32); // Stomach and intestinal lumen chyme
+ diffuseColor.rgb = mix(diffuseColor.rgb, gastroGlow, organGlow.b * 0.78);
+}
+if (organGlow.a > 0.005) {
+ vec3 arterialGlow = vec3(0.95, 0.25, 0.35); // Systemic bloodstream circulation pulse
+ diffuseColor.rgb = mix(diffuseColor.rgb, arterialGlow, organGlow.a * 0.65);
+}`);
    };materials.push(m);return m;
   };
 
@@ -313,6 +366,43 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.85, 0.78), partSelected * 
    timeUniform.value = clock.getElapsedTime();
    dirty = true;
 
+   // Drug digestion simulation: pill transit & organ clearance glow
+   if (s.simulation?.active) {
+    const sim = s.simulation;
+    const prog = Math.max(0, Math.min(1, sim.progress));
+    if (prog < 0.99) {
+     pillGroup.visible = true;
+     ingestionCurve.getPoint(prog, pillGroup.position);
+     const pillScale = Math.max(0.12, 1.0 - prog * 0.75);
+     pillGroup.scale.set(pillScale, pillScale, pillScale);
+     pillHalo.scale.setScalar(1.0 + Math.sin(clock.getElapsedTime() * 12.0) * 0.22);
+    } else {
+     pillGroup.visible = false;
+    }
+
+    atlas.parts.forEach((p, i) => {
+     let r = 0, g = 0, b = 0, a = 0;
+     if (liverPartIndices.has(i)) r = Math.round(sim.liverIntensity * 255);
+     if (kidneyPartIndices.has(i)) g = Math.round(sim.kidneyIntensity * 255);
+     if (stomachPartIndices.has(i)) b = Math.max(b, Math.round(sim.stomachLevel * 255));
+     if (gutPartIndices.has(i)) b = Math.max(b, Math.round(sim.gutLevel * 255));
+     if (p.system === 'arterial' || p.system === 'cardiac') a = Math.round(sim.plasmaLevel * 255);
+     glowData[i * 4] = r;
+     glowData[i * 4 + 1] = g;
+     glowData[i * 4 + 2] = b;
+     glowData[i * 4 + 3] = a;
+    });
+    glowTexture.needsUpdate = true;
+    dirty = true;
+   } else {
+    if (pillGroup.visible) pillGroup.visible = false;
+    if (glowData[0] !== 0 || glowData[1] !== 0) {
+     glowData.fill(0);
+     glowTexture.needsUpdate = true;
+     dirty = true;
+    }
+   }
+
    // Morphological scaling matching patient profile
    const patientScale = computeAnatomicalScale(s.patient);
    const prevScaleY = anatomyGroup.scale.y;
@@ -393,7 +483,7 @@ diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.85, 0.78), partSelected * 
 
   };animate();
   const contextLost=(e:Event)=>{e.preventDefault();onError('The 3D session was paused by your device. Reload to continue.');};renderer.domElement.addEventListener('webglcontextlost',contextLost);
-  return()=>{disposed=true;abort.abort();cancelAnimationFrame(frame);observer.disconnect();controls.dispose();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());scene.traverse(o=>{if(o instanceof T.Mesh&&!geometries.includes(o.geometry)){o.geometry.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose());}});env.dispose();partTexture.dispose();selectionTexture.dispose();markerGeometry.dispose();markerMaterial.dispose();hover.remove();renderer.domElement.removeEventListener('wheel',onWheel);renderer.dispose();renderer.domElement.remove();};
+  return()=>{disposed=true;abort.abort();cancelAnimationFrame(frame);observer.disconnect();controls.dispose();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());scene.traverse(o=>{if(o instanceof T.Mesh&&!geometries.includes(o.geometry)){o.geometry.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose());}});env.dispose();partTexture.dispose();selectionTexture.dispose();glowTexture.dispose();markerGeometry.dispose();markerMaterial.dispose();hover.remove();renderer.domElement.removeEventListener('wheel',onWheel);renderer.dispose();renderer.domElement.remove();};
  },[atlas]);
  return <div className="scene" ref={host}/>;
 }

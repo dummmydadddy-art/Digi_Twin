@@ -394,3 +394,424 @@ h1 .edition{font-family:inherit;font-weight:500;font-size:10px;letter-spacing:.0
 .patient-apply-btn:hover {
   background: #0369a1;
 }
+
+
+/* Drug Simulation & Pharmacokinetic Dashboard Styles */
+.drug-lab-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(220, 226, 232, 0.85);
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 9999px;
+  padding: 6px 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.15s ease;
+}
+.drug-lab-trigger:hover, .drug-lab-trigger.active {
+  background: #ffffff;
+  border-color: #0284c7;
+  color: #0284c7;
+}
+
+.sim-dashboard {
+  position: absolute;
+  top: 72px;
+  left: 24px;
+  width: 420px;
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 96px);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: simPanelSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes simPanelSlide {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 768px) {
+  .sim-dashboard {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-width: 100vw;
+    max-height: 82vh;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -8px 32px rgba(15, 23, 42, 0.15);
+  }
+}
+
+.sim-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+  background: rgba(248, 250, 252, 0.5);
+}
+.sim-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sim-header-title h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+.sim-scroll {
+  padding: 16px 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.drug-tabs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+}
+.drug-tab-btn {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: all 0.15s ease;
+}
+.drug-tab-btn small {
+  font-size: 10px;
+  font-weight: 400;
+  color: #64748b;
+}
+.drug-tab-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+.drug-tab-btn.active {
+  background: #f0f9ff;
+  border-color: #0284c7;
+  color: #0284c7;
+}
+.drug-tab-btn.active small {
+  color: #0369a1;
+}
+
+.dose-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dose-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+.dose-pill-group {
+  display: flex;
+  gap: 6px;
+}
+.dose-pill-btn {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.dose-pill-btn:hover {
+  background: #f8fafc;
+}
+.dose-pill-btn.active {
+  background: #0284c7;
+  border-color: #0284c7;
+  color: #ffffff;
+}
+
+.safety-status-box {
+  display: flex;
+  gap: 10px;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.safety-status-box.safety-blocked {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+.safety-status-box.safety-warning {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+}
+.safety-status-box.safety-safe {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+.safety-status-box strong {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.swallow-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 700;
+  padding: 12px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.28);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+.swallow-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+  box-shadow: 0 6px 18px rgba(2, 132, 199, 0.38);
+}
+.swallow-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.sim-playback-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.playback-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.playback-btn {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e293b;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.playback-btn:hover {
+  background: #f8fafc;
+}
+.playback-speed-group {
+  display: flex;
+  gap: 3px;
+}
+.speed-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #64748b;
+  cursor: pointer;
+}
+.speed-btn.active {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #0284c7;
+}
+.sim-clock-badge {
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0369a1;
+  background: #e0f2fe;
+  padding: 3px 8px;
+  border-radius: 5px;
+}
+
+.chart-container {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.chart-header span {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+.chart-header small {
+  font-size: 10px;
+  color: #94a3b8;
+}
+#chart {
+  width: 100%;
+  height: 140px;
+  display: block;
+}
+
+#eb {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.eb-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.eb-header span {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+.eb-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.eb-badge.optimal {
+  background: #dcfce7;
+  color: #15803d;
+}
+.eb-badge.subtherapeutic {
+  background: #f1f5f9;
+  color: #475569;
+}
+.eb-badge.high {
+  background: #fef3c7;
+  color: #b45309;
+}
+.eb-track {
+  width: 100%;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 9999px;
+  overflow: hidden;
+  position: relative;
+}
+.eb-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.15s ease, background 0.15s ease;
+}
+
+.compartment-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.compartment-card {
+  background: #f8fafc;
+  border: 1px solid #edf2f7;
+  border-radius: 6px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.compartment-card.liver {
+  border-left: 3px solid #f59e0b;
+}
+.compartment-card.kidney {
+  border-left: 3px solid #06b6d4;
+}
+.comp-name {
+  font-size: 10px;
+  font-weight: 600;
+  color: #64748b;
+}
+.comp-val {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.comp-val small {
+  font-size: 9.5px;
+  font-weight: 400;
+  color: #64748b;
+}
+
+.citations-accordion {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 10px;
+}
+.citations-toggle {
+  font-size: 11px;
+  font-weight: 600;
+  color: #0284c7;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.citations-content {
+  margin-top: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 10.5px;
+  color: #475569;
+  line-height: 1.45;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

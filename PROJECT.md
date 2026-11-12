@@ -196,24 +196,33 @@ BodyParts3D distinguishes between **Parts** (individual raw 3D mesh objects in t
 - [x] 3D anatomy root group, raycaster bounding boxes, and camera pivot target dynamically synced with scale factors.
 - [x] Verified in browser with 5 automated screenshot checkpoints.
 
-### Phase 5: Pharmacokinetics Engine & Drug Simulation (In Progress - Engine Complete)
+### Phase 5: Pharmacokinetics Engine & Drug Simulation (Completed)
 - [x] Pure TypeScript Pharmacokinetic Engine (`src/pk/`):
   - 5 physiological compartments: Stomach ($A_{\text{stomach}}$), Gut ($A_{\text{gut}}$), Systemic Plasma ($A_{\text{plasma}}$), Liver ($A_{\text{liver}}$), Kidney ($A_{\text{kidney}}$), plus unabsorbed lumen residue.
   - First-order stomach emptying ($k_{\text{empty}}$), intestinal carrier/passive absorption ($k_a$), oral bioavailability ($F$), volume of distribution ($V_d$ per kg), hepatic clearance ($CL_h$), and Cockcroft-Gault-modulated renal clearance ($CL_r$).
   - 4th-Order Runge-Kutta (RK4) numerical ODE solver with guaranteed mathematical mass conservation ($\Delta \sum A_i = 0$, error $< 0.0001\%$).
-  - Web Worker integration (`worker.ts` & `worker-client.ts`) allowing long-running multi-hour simulations to compute off the main UI/render thread.
+  - Web Worker integration (`worker.ts` & `worker-client.ts`) with synchronous engine fallback.
 - [x] Sourced Drug Catalog (`src/pk/drugs.json`):
-  - Paracetamol, Ibuprofen, Aspirin, Amoxicillin with literature citations (Prescott LF, Davies NM, Rowland M, Sjövall J, Goodman & Gilman, FDA NDAs, Rowland & Tozer) and explicit `"assumption: ..."` tags for fasted gastric motility.
-  - Clinical therapeutic windows, toxic thresholds, and literature $T_{\max}$ / $C_{\max}$ ranges.
+  - Paracetamol, Ibuprofen, Aspirin, Amoxicillin with peer-reviewed literature citations (Prescott LF 1980, Davies NM 1998, Rowland M 1968, Sjövall J 1985, Goodman & Gilman 14th Ed, FDA reviews, Rowland & Tozer 5th Ed) and explicit `"assumption: fasted gastric motility"` tags.
+  - Clinical therapeutic windows, toxic thresholds, and documented literature $T_{\max}$ / $C_{\max}$ peak ranges.
 - [x] Clinical Safety Module (`src/pk/safety.ts`):
-  - Allergy contraindication block: locks simulation if patient has matching documented hypersensitivity (e.g. penicillin blocks amoxicillin; NSAIDs block aspirin and ibuprofen).
-  - Per-kg weight-adjusted dose warning: flags doses exceeding safe single-dose thresholds (e.g. $> 15\text{ mg/kg}$ for paracetamol, $> 10\text{ mg/kg}$ for ibuprofen).
+  - Allergy contraindication block: locks simulation if patient has matching hypersensitivity (Penicillin blocks Amoxicillin with red alert and disables Swallow button; NSAID allergy blocks Aspirin and Ibuprofen).
+  - Per-kg weight-adjusted dose warning: flags doses exceeding safe single-dose thresholds (e.g. Paracetamol 1000mg in 45kg patient = 22.2 mg/kg, exceeding 15 mg/kg threshold, displaying amber warning).
 - [x] Comprehensive Unit Test Suite (`src/pk/__tests__/pk.test.ts`):
-  - 18/18 tests passing across 4 suites: mass conservation across 24 hours, patient weight scaling (45kg to 120kg), $T_{\max}$ and $C_{\max}$ literature validation, organ clearance routes (hepatic vs renal predominance), allergy blocks, and per-kg dose warnings.
-- [ ] 3D Oral Ingestion Spline & Particle Transit (mouth > esophagus > stomach > small intestine > blood).
-- [ ] Real-time Liver and Kidney clearance illumination in Three.js shaders.
-- [ ] Live Bateman concentration chart (`#chart`) and therapeutic effect bar (`#eb`).
-- [ ] Drug selection & simulation controls UI.
+  - 18/18 unit tests passing across 4 suites: mass conservation across 24 hours, patient weight scaling (45kg to 120kg), $T_{\max}$ and $C_{\max}$ literature validation, organ clearance routes (hepatic vs renal predominance), allergy blocks, and per-kg dose warnings.
+- [x] 3D Oral Ingestion Spline & Particle Transit:
+  - Catmull-Rom spline path connecting oral cavity, pharynx, esophagus (`FJ2563`), stomach (`FJ2564`), and duodenum (`FJ2573`).
+  - Swallowed 3D tablet particle (glowing core and soft spherical halo) transits smoothly through the GI tract as layers auto-peel to Organs (78%).
+- [x] Real-time Liver and Kidney Clearance Illumination:
+  - Dynamic 1D data texture (`glowTexture`) sampled in the fragment shader without adding draw calls.
+  - Liver glows with a warm golden-amber metabolic clearance hue (`vec3(0.98, 0.62, 0.16)`) during hepatic metabolism.
+  - Kidneys illuminate with a vibrant cyan filtration hue (`vec3(0.18, 0.84, 0.96)`) during renal excretion.
+- [x] Live Bateman Concentration Chart (`#chart`) & Therapeutic Effect Bar (`#eb`):
+  - Live 24-hour plasma concentration curve on HTML5 canvas with shaded therapeutic window, dashed MEC line, and dashed toxic threshold line.
+  - Live animated effect bar tracking subtherapeutic (< MEC), therapeutic active range, and toxic levels with status badge.
+  - Live compartment mass distribution readouts (Stomach, Gut, Plasma, Liver Cleared, Kidney Excreted).
+  - Simulation playback controls: Play/Pause, speed multipliers ($1\times, 5\times, 20\times$), simulation clock, and reset (Esc).
+- [x] Verified in browser with 7 automated screenshot checkpoints.
 
 ### Phase 6: 60 FPS Polish & Mobile/Desktop Optimization
 - [ ] GPU shader optimization, frame budget auditing, and memory cleanup.

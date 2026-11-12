@@ -1,7 +1,7 @@
 import {flushSync} from 'react-dom';
 import {registerAtlasTools} from './agent-tools';
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {Activity,ArrowUpRight,ChevronRight,Focus,Info,Layers3,Pause,RotateCcw,RotateCw,Search,User,X} from 'lucide-react';
+import {Activity,AlertTriangle,ArrowUpRight,CheckCircle2,ChevronRight,FastForward,Focus,Info,Layers3,Pause,Pill,Play,RotateCcw,RotateCw,Search,ShieldAlert,Sparkles,User,X} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Badge} from '@/components/ui/badge';
 import {Slider} from '@/components/ui/slider';
@@ -9,7 +9,10 @@ import {Switch} from '@/components/ui/switch';
 import {Sheet,SheetContent,SheetTitle,SheetDescription} from '@/components/ui/sheet';
 import {Combobox,ComboboxInput,ComboboxContent,ComboboxList,ComboboxItem,ComboboxEmpty} from '@/components/ui/combobox';
 import AnatomyScene from './scene';
-import {DEFAULT_VISIBLE,SYSTEMS,EXPLANATIONS,explanation,getSystemTier,getOrganDossier,computeAnatomicalScale,DEFAULT_PATIENT_PROFILE,type Atlas,type Concept,type SceneState,type SystemId,type View,type PatientProfile,type BloodGroup,type DrugAllergy,type Sex} from './anatomy';
+import {DEFAULT_VISIBLE,SYSTEMS,EXPLANATIONS,explanation,getSystemTier,getOrganDossier,computeAnatomicalScale,DEFAULT_PATIENT_PROFILE,type Atlas,type Concept,type SceneState,type SystemId,type View,type PatientProfile,type BloodGroup,type DrugAllergy,type Sex,type SimulationVisualState} from './anatomy';
+import {DRUGS,checkDrugSafety,getDrugById} from '@/src/pk/safety';
+import {runSimulation} from '@/src/pk/engine';
+import type {DrugDefinition,DrugId,PatientPkParams,PkCompartmentState,SafetyCheckResult,SimulationResult} from '@/src/pk/types';
 
 const initial:SceneState={explode:0,peel:0,cutaway:true,visible:DEFAULT_VISIBLE,selected:[],isolate:false,view:'three-quarter',rotate:false,reset:0,patient:DEFAULT_PATIENT_PROFILE};
 
@@ -24,6 +27,16 @@ function getPeelTierLabel(peel:number=0):string{
 export default function Home(){
  const detailTitle=useRef<HTMLHeadingElement>(null);
  const [atlas,setAtlas]=useState<Atlas|null>(null),[state,setState]=useState(initial),[progress,setProgress]=useState(0),[error,setError]=useState(''),[panel,setPanel]=useState<'layers'|'search'|null>(null),[details,setDetails]=useState(false),[about,setAbout]=useState(false),[patientOpen,setPatientOpen]=useState(false),[query,setQuery]=useState(''),[chosen,setChosen]=useState<Concept|null>(null);
+ const [simPanelOpen, setSimPanelOpen] = useState(false);
+ const [selectedDrugId, setSelectedDrugId] = useState<DrugId>('paracetamol');
+ const [selectedDoseMg, setSelectedDoseMg] = useState<number>(500);
+ const [simRunning, setSimRunning] = useState(false);
+ const [simPaused, setSimPaused] = useState(false);
+ const [simSpeed, setSimSpeed] = useState<number>(5);
+ const [simTimeHours, setSimTimeHours] = useState<number>(0);
+ const [simResult, setSimResult] = useState<SimulationResult | null>(null);
+ const [showCitations, setShowCitations] = useState(false);
+ const chartRef = useRef<HTMLCanvasElement>(null);
 
  useEffect(()=>{
   const abort=new AbortController();setProgress(0);setError('');setAtlas(null);setChosen(null);setDetails(false);setState({...initial,visible:DEFAULT_VISIBLE});
@@ -31,7 +44,10 @@ export default function Home(){
   return()=>abort.abort();
  },[]);
 
- const reset=()=>{setState(s=>({...initial,cutaway:true,visible:DEFAULT_VISIBLE,patient:s.patient,reset:s.reset+1}));setChosen(null);setDetails(false);setPanel(null);setPatientOpen(false);};
+ const reset=()=>{
+  setState(s=>({...initial,cutaway:true,visible:DEFAULT_VISIBLE,patient:s.patient,simulation:{active:false,progress:0,stomachLevel:0,gutLevel:0,plasmaLevel:0,liverIntensity:0,kidneyIntensity:0},reset:s.reset+1}));
+  setChosen(null);setDetails(false);setPanel(null);setPatientOpen(false);setSimRunning(false);setSimPaused(false);setSimTimeHours(0);setSimResult(null);
+ };
 
  useEffect(()=>{
   const key=(e:KeyboardEvent)=>{
@@ -92,11 +108,362 @@ export default function Home(){
  const toggle=(id:SystemId)=>{setDetails(false);setState(s=>({...s,selected:[],isolate:false,visible:s.visible.includes(id)?s.visible.filter(x=>x!==id):[...s.visible,id]}));};
  const openPanel=(next:'layers'|'search')=>{setDetails(false);setPanel(p=>p===next?null:next);};
 
+ const currentDrug = useMemo<DrugDefinition>(() => getDrugById(selectedDrugId) ?? DRUGS[0], [selectedDrugId]);
+
+ const patientPkParams: PatientPkParams = useMemo(() => ({
+  weightKg: patient.weightKg,
+  heightCm: patient.heightCm,
+  age: patient.age,
+  sex: patient.sex,
+  allergy: patient.allergy,
+  eCrCl: scale.crClMlMin,
+ }), [patient, scale.crClMlMin]);
+
+ const safety = useMemo<SafetyCheckResult>(
+  () => checkDrugSafety(currentDrug, selectedDoseMg, patientPkParams),
+  [currentDrug, selectedDoseMg, patientPkParams]
+ );
+
+ const handleDrugChange = (id: DrugId) => {
+  setSelectedDrugId(id);
+  const drug = getDrugById(id) ?? DRUGS[0];
+  setSelectedDoseMg(drug.standardDoseMg);
+  setSimRunning(false);
+  setSimPaused(false);
+  setSimTimeHours(0);
+  setSimResult(null);
+  setState(s => ({
+   ...s,
+   simulation: {
+    active: false,
+    progress: 0,
+    stomachLevel: 0,
+    gutLevel: 0,
+    plasmaLevel: 0,
+    liverIntensity: 0,
+    kidneyIntensity: 0,
+   },
+  }));
+ };
+
+ const handleSwallow = () => {
+  if (safety.isBlocked) return;
+  const result = runSimulation({
+   drugId: currentDrug.id,
+   doseMg: selectedDoseMg,
+   patient: patientPkParams,
+   durationHours: 24,
+   timeStepHours: 0.01,
+  });
+  setSimResult(result);
+  setSimTimeHours(0);
+  setSimRunning(true);
+  setSimPaused(false);
+  setState(s => ({
+   ...s,
+   peel: Math.max(s.peel ?? 0, 0.78),
+   simulation: {
+    active: true,
+    progress: 0,
+    stomachLevel: 1.0,
+    gutLevel: 0,
+    plasmaLevel: 0,
+    liverIntensity: 0,
+    kidneyIntensity: 0,
+   },
+  }));
+ };
+
+ const handleTogglePlayPause = () => {
+  if (!simRunning && simResult) {
+   setSimRunning(true);
+   setSimPaused(false);
+  } else {
+   setSimPaused(p => !p);
+  }
+ };
+
+ const handleResetSim = () => {
+  setSimRunning(false);
+  setSimPaused(false);
+  setSimTimeHours(0);
+  setSimResult(null);
+  setState(s => ({
+   ...s,
+   simulation: {
+    active: false,
+    progress: 0,
+    stomachLevel: 0,
+    gutLevel: 0,
+    plasmaLevel: 0,
+    liverIntensity: 0,
+    kidneyIntensity: 0,
+   },
+  }));
+ };
+
+ useEffect(() => {
+  if (!simRunning || simPaused || !simResult) return;
+  let lastTime = performance.now();
+  let frameId: number;
+
+  const tick = (now: number) => {
+   const dtSec = (now - lastTime) / 1000;
+   lastTime = now;
+   const deltaSimHours = dtSec * simSpeed;
+   setSimTimeHours(prev => {
+    const next = prev + deltaSimHours;
+    if (next >= 24) {
+     setSimRunning(false);
+     return 24;
+    }
+    return next;
+   });
+   frameId = requestAnimationFrame(tick);
+  };
+
+  frameId = requestAnimationFrame(tick);
+  return () => cancelAnimationFrame(frameId);
+ }, [simRunning, simPaused, simResult, simSpeed]);
+
+ const currentSample: PkCompartmentState = useMemo(() => {
+  if (!simResult || simResult.samples.length === 0) {
+   return {
+    timeHours: simTimeHours,
+    stomachMg: 0,
+    gutMg: 0,
+    plasmaMg: 0,
+    plasmaConcentrationMgL: 0,
+    liverMetabolizedMg: 0,
+    kidneyExcretedMg: 0,
+    unabsorbedMg: 0,
+    totalAccountedMg: 0,
+    massBalanceErrorPercent: 0,
+   };
+  }
+  const ratio = Math.min(1, Math.max(0, simTimeHours / 24));
+  const idx = Math.min(
+   Math.floor(ratio * (simResult.samples.length - 1)),
+   simResult.samples.length - 1
+  );
+  return simResult.samples[idx];
+ }, [simResult, simTimeHours]);
+
+ useEffect(() => {
+  if (!simRunning && !simResult) return;
+  const pillProgress = Math.min(1, simTimeHours / 0.65);
+  const maxRef = Math.max(simResult?.cmaxMgL ?? 10, currentDrug.toxicThresholdMgL);
+  const plasmaNorm = Math.min(1, currentSample.plasmaConcentrationMgL / (maxRef * 0.75));
+
+  const liverInt = (currentDrug.clearanceRoute === 'hepatic' || currentDrug.clearanceRoute === 'mixed')
+   ? Math.min(1, (currentSample.liverMetabolizedMg / (selectedDoseMg * currentDrug.hepaticFraction + 0.001)) * (plasmaNorm > 0.05 ? 1.0 : plasmaNorm * 4))
+   : 0;
+
+  const kidneyInt = (currentDrug.clearanceRoute === 'renal' || currentDrug.clearanceRoute === 'mixed')
+   ? Math.min(1, (currentSample.kidneyExcretedMg / (selectedDoseMg * currentDrug.renalFraction + 0.001)) * (plasmaNorm > 0.05 ? 1.0 : plasmaNorm * 4))
+   : 0;
+
+  setState(s => ({
+   ...s,
+   simulation: {
+    active: true,
+    progress: pillProgress,
+    stomachLevel: Math.min(1, currentSample.stomachMg / (selectedDoseMg || 1)),
+    gutLevel: Math.min(1, currentSample.gutMg / (selectedDoseMg || 1)),
+    plasmaLevel: plasmaNorm,
+    liverIntensity: liverInt,
+    kidneyIntensity: kidneyInt,
+   },
+  }));
+ }, [simTimeHours, currentSample, simRunning, simResult, selectedDoseMg, currentDrug]);
+
+ const cp = currentSample.plasmaConcentrationMgL;
+ const mec = currentDrug.targetRangeMgL.min;
+ const toxic = currentDrug.toxicThresholdMgL;
+
+ let effectBadgeClass = 'subtherapeutic';
+ let effectBadgeLabel = 'Subtherapeutic (Inactive)';
+ let effectGradient = 'linear-gradient(90deg, #94a3b8, #64748b)';
+ let efficacyPct = 0;
+
+ if (cp < 0.01) {
+  effectBadgeClass = 'inactive';
+  effectBadgeLabel = 'Clear (Zero Plasma Level)';
+  efficacyPct = 0;
+ } else if (cp < mec) {
+  effectBadgeClass = 'subtherapeutic';
+  effectBadgeLabel = 'Subtherapeutic (< MEC)';
+  efficacyPct = Math.min(50, (cp / mec) * 50);
+  effectGradient = 'linear-gradient(90deg, #38bdf8, #0284c7)';
+ } else if (cp <= toxic) {
+  effectBadgeClass = 'therapeutic';
+  effectBadgeLabel = 'Active Therapeutic Range';
+  efficacyPct = 50 + Math.min(50, ((cp - mec) / Math.max(0.1, toxic - mec)) * 50);
+  effectGradient = 'linear-gradient(90deg, #10b981, #059669)';
+ } else {
+  effectBadgeClass = 'toxic';
+  effectBadgeLabel = 'Toxic Threshold Exceeded';
+  efficacyPct = 100;
+  effectGradient = 'linear-gradient(90deg, #f59e0b, #ef4444)';
+ }
+
+ useEffect(() => {
+  const canvas = chartRef.current;
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const width = rect.width || 340;
+  const height = rect.height || 140;
+
+  if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
+   canvas.width = width * dpr;
+   canvas.height = height * dpr;
+  }
+
+  ctx.save();
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, width, height);
+
+  const padLeft = 38;
+  const padRight = 14;
+  const padTop = 16;
+  const padBottom = 24;
+  const plotW = width - padLeft - padRight;
+  const plotH = height - padTop - padBottom;
+
+  ctx.fillStyle = '#090d16';
+  ctx.fillRect(0, 0, width, height);
+
+  const yMax = Math.max(
+   (simResult?.cmaxMgL ?? 10) * 1.25,
+   currentDrug.toxicThresholdMgL * 1.15,
+   1
+  );
+
+  const toX = (h: number) => padLeft + (h / 24) * plotW;
+  const toY = (val: number) => padTop + plotH - (Math.min(val, yMax) / yMax) * plotH;
+
+  const yMec = toY(currentDrug.targetRangeMgL.min);
+  const yTox = toY(currentDrug.toxicThresholdMgL);
+  const bandTop = Math.max(padTop, yTox);
+  const bandBottom = Math.min(padTop + plotH, yMec);
+
+  if (bandBottom > bandTop) {
+   ctx.fillStyle = 'rgba(16, 185, 129, 0.08)';
+   ctx.fillRect(padLeft, bandTop, plotW, bandBottom - bandTop);
+  }
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+   const y = padTop + (plotH / 4) * i;
+   ctx.beginPath();
+   ctx.moveTo(padLeft, y);
+   ctx.lineTo(padLeft + plotW, y);
+   ctx.stroke();
+
+   const val = yMax * (1 - i / 4);
+   ctx.fillStyle = '#64748b';
+   ctx.font = '9px monospace';
+   ctx.textAlign = 'right';
+   ctx.fillText(val.toFixed(1), padLeft - 6, y + 3);
+  }
+
+  for (let h = 0; h <= 24; h += 6) {
+   const x = toX(h);
+   ctx.beginPath();
+   ctx.moveTo(x, padTop);
+   ctx.lineTo(x, padTop + plotH);
+   ctx.stroke();
+
+   ctx.fillStyle = '#64748b';
+   ctx.font = '9px monospace';
+   ctx.textAlign = 'center';
+   ctx.fillText(`${h}h`, x, padTop + plotH + 14);
+  }
+
+  ctx.save();
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = '#10b981';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padLeft, yMec);
+  ctx.lineTo(padLeft + plotW, yMec);
+  ctx.stroke();
+  ctx.fillStyle = '#10b981';
+  ctx.font = '8px monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText('MEC', padLeft + plotW, yMec - 3);
+
+  ctx.strokeStyle = '#f87171';
+  ctx.beginPath();
+  ctx.moveTo(padLeft, yTox);
+  ctx.lineTo(padLeft + plotW, yTox);
+  ctx.stroke();
+  ctx.fillStyle = '#f87171';
+  ctx.fillText('TOXIC', padLeft + plotW, yTox - 3);
+  ctx.restore();
+
+  if (simResult && simResult.samples.length > 0) {
+   ctx.beginPath();
+   ctx.strokeStyle = '#38bdf8';
+   ctx.lineWidth = 2;
+   simResult.samples.forEach((pt: PkCompartmentState, i: number) => {
+    const x = toX(pt.timeHours);
+    const y = toY(pt.plasmaConcentrationMgL);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+   });
+   ctx.stroke();
+
+   ctx.lineTo(toX(24), padTop + plotH);
+   ctx.lineTo(toX(0), padTop + plotH);
+   ctx.closePath();
+   const grad = ctx.createLinearGradient(0, padTop, 0, padTop + plotH);
+   grad.addColorStop(0, 'rgba(56, 189, 248, 0.22)');
+   grad.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+   ctx.fillStyle = grad;
+   ctx.fill();
+
+   const curX = toX(simTimeHours);
+   ctx.strokeStyle = '#f59e0b';
+   ctx.lineWidth = 1.5;
+   ctx.beginPath();
+   ctx.moveTo(curX, padTop);
+   ctx.lineTo(curX, padTop + plotH);
+   ctx.stroke();
+
+   const curY = toY(currentSample.plasmaConcentrationMgL);
+   ctx.fillStyle = '#f59e0b';
+   ctx.beginPath();
+   ctx.arc(curX, curY, 4, 0, Math.PI * 2);
+   ctx.fill();
+   ctx.strokeStyle = '#ffffff';
+   ctx.lineWidth = 1;
+   ctx.stroke();
+  }
+
+  ctx.restore();
+ }, [simResult, simTimeHours, currentSample, currentDrug]);
  return <main className="studio">
   {atlas&&<AnatomyScene atlas={atlas} state={{...state,inspectorOpen:details&&selectedParts.length>0}} onSelect={choosePart} onPeelChange={peel=>setState(s=>({...s,peel}))} onProgress={n=>{setProgress(n);if(n===100)setError('');}} onError={setError}/>}
   <div className="vignette"/>
   <header className="identity"><div className="eyebrow"><span className="status-dot"/> 3D ANATOMY & DRUG LAB</div><h1>Body Twin<Badge variant="outline" className="edition">3D</Badge></h1><div className="identity-meta">Educational model <span>·</span> Not medical advice</div></header>
   <nav className="top-actions" aria-label="Explorer panels">
+   <Button
+    variant="ghost"
+    className={`drug-lab-trigger ${simPanelOpen ? 'active' : ''}`}
+    onClick={() => { setDetails(false); setPanel(null); setAbout(false); setPatientOpen(false); setSimPanelOpen(o => !o); }}
+    aria-label="Open Drug Digestion Simulator"
+    title="Pharmacokinetic Drug Simulation Lab"
+   >
+    <Pill size={18} />
+    <span>Drug Lab</span>
+    {simRunning && <span className="status-dot" style={{ background: '#0284c7' }} />}
+   </Button>
    <Button
     variant="ghost"
     className={`patient-trigger ${patientOpen ? 'active' : ''}`}
@@ -120,6 +487,219 @@ export default function Home(){
    <div className="system-list">{activeSystems.map(s=><div className={`system-row ${state.visible.includes(s.id)?'enabled':''}`} key={s.id}><Button variant="ghost" className="system-name" title={`Show only ${s.name.toLowerCase()}`} onClick={()=>setState(v=>({...v,visible:[s.id],isolate:false,selected:[]}))}><span className="system-dot" style={{background:s.color}}/>{s.name}<span className="system-count">{counts[s.id]}</span></Button><Switch checked={state.visible.includes(s.id)} onCheckedChange={()=>toggle(s.id)} aria-label={`Show ${s.name.toLowerCase()}`} /></div>)}</div>
    <div className="panel-foot"><span>{visibleCount.toLocaleString()} pieces visible</span><Button variant="ghost" onClick={()=>setState(s=>({...s,visible:[],selected:[],isolate:false}))}>Hide all</Button></div>
   </section>
+
+  {simPanelOpen && (
+   <section className="sim-dashboard" aria-label="Pharmacokinetic Drug Simulator">
+    <div className="sim-header">
+     <div className="sim-header-title">
+      <Pill size={18} style={{ color: '#0284c7' }} />
+      <h3>Drug Digestion Lab</h3>
+      <Badge variant="outline" className="edition" style={{ fontSize: '10px' }}>PK Engine</Badge>
+     </div>
+     <Button variant="ghost" className="icon-button" onClick={() => setSimPanelOpen(false)} aria-label="Close drug lab">
+      <X size={18} />
+     </Button>
+    </div>
+
+    <div className="sim-scroll">
+     {/* Drug selection tabs */}
+     <div className="drug-tabs-grid">
+      {DRUGS.map(d => (
+       <button
+        key={d.id}
+        type="button"
+        className={`drug-tab-btn ${selectedDrugId === d.id ? 'active' : ''}`}
+        onClick={() => handleDrugChange(d.id)}
+       >
+        <span>{d.name}</span>
+        <small>{d.therapeuticClass.split('&')[0]}</small>
+       </button>
+      ))}
+     </div>
+
+     {/* Dose selector */}
+     <div className="dose-row">
+      <span className="dose-label">Select Oral Dose:</span>
+      <div className="dose-pill-group">
+       {currentDrug.availableDosesMg.map(dose => (
+        <button
+         key={dose}
+         type="button"
+         className={`dose-pill-btn ${selectedDoseMg === dose ? 'active' : ''}`}
+         onClick={() => {
+          setSelectedDoseMg(dose);
+          setSimRunning(false);
+          setSimPaused(false);
+          setSimTimeHours(0);
+          setSimResult(null);
+         }}
+        >
+         {dose} mg
+        </button>
+       ))}
+      </div>
+     </div>
+
+     {/* Safety status card: Allergy Block & Dose Warning */}
+     {safety.isBlocked ? (
+      <div className="safety-status-box safety-blocked">
+       <ShieldAlert size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+       <div>
+        <strong>CONTRAINDICATION BLOCKED</strong>
+        <p>{safety.blockReason}</p>
+       </div>
+      </div>
+     ) : safety.hasWarning ? (
+      <div className="safety-status-box safety-warning">
+       <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+       <div>
+        <strong>HIGH DOSE ALERT ({safety.weightDoseMgKg.toFixed(1)} mg/kg)</strong>
+        <p>{safety.warningMessage}</p>
+       </div>
+      </div>
+     ) : (
+      <div className="safety-status-box safety-safe">
+       <CheckCircle2 size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+       <div>
+        <strong>Safe Standard Dose ({safety.weightDoseMgKg.toFixed(1)} mg/kg)</strong>
+        <p>No documented contraindications for current patient ({patient.sex}, {patient.weightKg} kg).</p>
+       </div>
+      </div>
+     )}
+
+     {/* Primary Swallow Action */}
+     <button
+      type="button"
+      id="swallow-btn"
+      className="swallow-btn"
+      disabled={!safety.allowed || simRunning}
+      onClick={handleSwallow}
+     >
+      <Pill size={18} />
+      <span>{simRunning ? 'Digesting & Dissolving…' : `Swallow ${selectedDoseMg}mg ${currentDrug.name}`}</span>
+     </button>
+
+     {/* Simulation Playback & Time Controls */}
+     <div className="sim-playback-bar">
+      <div className="playback-controls-group">
+       <button
+        type="button"
+        className="playback-btn"
+        onClick={handleTogglePlayPause}
+        disabled={!safety.allowed}
+       >
+        {simRunning && !simPaused ? <Pause size={14} /> : <Play size={14} />}
+        <span>{simRunning && !simPaused ? 'Pause' : simPaused ? 'Resume' : 'Start'}</span>
+       </button>
+       <button
+        type="button"
+        className="playback-btn"
+        onClick={handleResetSim}
+        title="Reset simulation"
+       >
+        <RotateCcw size={14} />
+       </button>
+      </div>
+
+      <div className="playback-speed-group">
+       {[1, 5, 20].map(sp => (
+        <button
+         key={sp}
+         type="button"
+         className={`speed-btn ${simSpeed === sp ? 'active' : ''}`}
+         onClick={() => setSimSpeed(sp)}
+        >
+         {sp}×
+        </button>
+       ))}
+      </div>
+
+      <div className="sim-clock-badge">
+       T + {Math.floor(simTimeHours).toString().padStart(2, '0')}h {Math.round((simTimeHours % 1) * 60).toString().padStart(2, '0')}m
+      </div>
+     </div>
+
+     {/* Live Concentration Graph (#chart) */}
+     <div className="chart-container">
+      <div className="chart-header">
+       <span>LIVE PLASMA CONCENTRATION (Cp)</span>
+       <small>24-Hour Bateman RK4 Curve</small>
+      </div>
+      <canvas id="chart" ref={chartRef} />
+     </div>
+
+     {/* Live Therapeutic Effect Bar (#eb) */}
+     <div id="eb">
+      <div className="eb-header">
+       <span>THERAPEUTIC EFFECTIVENESS</span>
+       <span className={`eb-badge ${effectBadgeClass}`}>{effectBadgeLabel}</span>
+      </div>
+      <div className="eb-track">
+       <div
+        className="eb-fill"
+        style={{
+         width: `${efficacyPct}%`,
+         background: effectGradient,
+        }}
+       />
+      </div>
+     </div>
+
+     {/* Compartment Mass Distribution Readouts */}
+     <div className="compartment-grid">
+      <div className="compartment-card">
+       <span className="comp-name">Stomach</span>
+       <span className="comp-val">{currentSample.stomachMg.toFixed(1)} <small>mg</small></span>
+      </div>
+      <div className="compartment-card">
+       <span className="comp-name">Intestinal Gut</span>
+       <span className="comp-val">{currentSample.gutMg.toFixed(1)} <small>mg</small></span>
+      </div>
+      <div className="compartment-card">
+       <span className="comp-name">Plasma (Cp)</span>
+       <span className="comp-val">{currentSample.plasmaConcentrationMgL.toFixed(2)} <small>mg/L</small></span>
+      </div>
+      <div className="compartment-card liver">
+       <span className="comp-name">Liver Cleared</span>
+       <span className="comp-val">{currentSample.liverMetabolizedMg.toFixed(1)} <small>mg</small></span>
+      </div>
+      <div className="compartment-card kidney">
+       <span className="comp-name">Kidney Excreted</span>
+       <span className="comp-val">{currentSample.kidneyExcretedMg.toFixed(1)} <small>mg</small></span>
+      </div>
+      <div className="compartment-card">
+       <span className="comp-name">Elimination Route</span>
+       <span className="comp-val" style={{ textTransform: 'capitalize', fontSize: '11px' }}>{currentDrug.clearanceRoute}</span>
+      </div>
+     </div>
+
+     {/* Sourced Pharmacokinetic Citations */}
+     <div className="citations-accordion">
+      <button
+       type="button"
+       className="citations-toggle"
+       onClick={() => setShowCitations(v => !v)}
+      >
+       <Sparkles size={13} />
+       <span>{showCitations ? 'Hide Parameter Citations' : 'View Pharmacokinetic Sources'}</span>
+      </button>
+      {showCitations && (
+       <div className="citations-content">
+        <p><strong>Bioavailability (F):</strong> {currentDrug.sources.bioavailability}</p>
+        <p><strong>Absorption (ka):</strong> {currentDrug.sources.ka}</p>
+        <p><strong>Volume of Dist (Vd):</strong> {currentDrug.sources.vdPerKg}</p>
+        <p><strong>Total Clearance (CL):</strong> {currentDrug.sources.clPerKg}</p>
+        <p><strong>Hepatic Fraction:</strong> {currentDrug.sources.hepaticFraction}</p>
+        <p><strong>Renal Fraction:</strong> {currentDrug.sources.renalFraction}</p>
+        <p><strong>Literature Peak:</strong> {currentDrug.sources.documentedPeak}</p>
+        <p style={{ marginTop: '4px', color: '#0369a1', fontWeight: 600 }}>Educational demonstration only. Not clinical or medical advice.</p>
+       </div>
+      )}
+     </div>
+    </div>
+   </section>
+  )}
+
   {panel==='search'&&<section className="search-panel glass" aria-label="Find anatomy"><div className="panel-heading"><span>Find a structure</span><Button variant="ghost" className="icon-button" onClick={()=>setPanel(null)} aria-label="Close search"><X size={18}/></Button></div><Combobox<Concept> items={results} value={null} onValueChange={value=>{if(value)choose(value);}} inputValue={query} onInputValueChange={setQuery} itemToStringLabel={c=>c.name} filter={null} open onOpenChange={open=>{if(!open)setPanel(null);}}><ComboboxInput autoFocus placeholder="Heart, femur, cranial nerve…" aria-label="Search named anatomical structures" showTrigger={false}/><ComboboxContent className="anatomy-search-results"><ComboboxEmpty>No structures match your search.</ComboboxEmpty><ComboboxList>{(c:Concept)=><ComboboxItem key={c.id} value={c}><span className="search-result-name">{c.name}</span><span className="small-number">{c.elements.length} {c.elements.length===1?'piece':'pieces'}</span></ComboboxItem>}</ComboboxList></ComboboxContent></Combobox><p className="search-note">{query?'Showing up to 80 matches. Refine your search to find smaller structures.':'Start with a major organ, or search every named structure.'}</p></section>}
   <nav className="view-controls glass" aria-label="Camera controls">{(['three-quarter','front','side','back'] as View[]).map((v,i)=><Button variant="ghost" key={v} className={state.view===v?'active':''} aria-pressed={state.view===v} disabled={state.explode>.8&&v!=='front'} onClick={()=>setState(s=>({...s,view:v,reset:s.reset+1,rotate:false}))} title={`${v} view`} aria-label={`${v} view`}><span>{['¾','F','S','B'][i]}</span></Button>)}<i/><Button variant="ghost" disabled={state.explode>=.4} aria-label={state.rotate?'Pause rotation':'Rotate body'} title="Auto rotate" className={state.rotate?'active':''} onClick={()=>setState(s=>({...s,rotate:!s.rotate}))}>{state.rotate?<Pause size={17}/>:<RotateCw size={18}/>}</Button><Button variant="ghost" aria-label="Reset view and layers" title="Reset (Esc)" onClick={reset}><RotateCcw size={17}/></Button></nav>
   <div className="scene-caption"><span className="caption-line"/><span>{state.isolate?(chosen?.name??'SELECTED STRUCTURE'):state.explode>.95?'ANATOMICAL INVENTORY':state.explode>.05?'SEPARATED STRUCTURES':(state.peel??0)>.05?`PEEL: ${getPeelTierLabel(state.peel).toUpperCase()} LAYER`:`${patient.age}YO ${patient.sex.toUpperCase()} · ${patient.heightCm}CM · ${patient.weightKg}KG · APPROXIMATION`}</span><span className="caption-line"/></div>
