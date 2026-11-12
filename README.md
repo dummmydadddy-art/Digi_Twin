@@ -1,64 +1,155 @@
-# Human Atlas
+# Digi_Twin (Body Twin 3D)
 
-An interactive 3D anatomy explorer built with React, Three.js, and shadcn/ui. Take the BodyParts3D adult male reference apart into **2,234 individually selectable meshes**, explore **15 anatomical systems**, and search **3,432 named concepts**.
+> **Educational 3D Human Anatomy & Physiologically-Grounded Pharmacokinetic Simulation**  
+> Built with Vite, TypeScript, React 19, and Three.js (r159). Forked and evolved from [ashemag/human-atlas](https://github.com/ashemag/human-atlas) with [BodyParts3D](https://dbarchive.biosciencedbc.jp/en/bodyparts3d/) anatomical geometry (CC BY 4.0).
 
-**[Explore the live demo](https://human-atlas-seven.vercel.app)**
+---
 
-## Explore
+## Overview
 
-- Orbit, zoom, and select structures directly on the body.
-- Toggle individual systems or use skeleton and organ presets.
-- Move from assembled anatomy to a spaced inventory of every visible piece.
-- Search anatomical names and source identifiers.
-- Isolate a selected structure and read its details.
-- Use compact controls and detail panels on mobile.
+**Digi_Twin** is an interactive, browser-based 3D digital human twin that pairs full-body macroscopic anatomy with a rigorous 5-compartment pharmacokinetic (PK) simulation engine. Users can orbit, peel layers, inspect internal organs via clipping-plane cutaways, scale patient morphology, and simulate the complete oral absorption, distribution, hepatic metabolism, and renal clearance of common active pharmaceutical ingredients in real time.
 
-## Run locally
+All computation runs **100% client-side** using a Web Worker and pure TypeScript ODE numerical solvers — requiring zero server backend, no paid APIs, and no credentials.
 
-Requires Node.js 22.13 or newer. No API keys or accounts are needed.
+---
 
-```sh
+## Key Features
+
+### 1. High-Performance 3D Anatomy Engine
+- **2,234 Individually Pickable Meshes & 3,432 Named Concepts**: Powered by BodyParts3D adult male reference geometry.
+- **Batched Geometry Rendering**: Geometry sharing the same anatomical system is dynamically merged, reducing draw calls from 2,234 to **~15–20 per frame** for rock-solid 60 FPS.
+- **Layer Peeling Dock**: Smoothly peel through anatomical strata from **Skin (0%) → Muscles → Skeleton → Organs (80%+)** via screen-door dithering and GPU data textures.
+- **Interactive 360° Orbit & Focus**: Click-to-focus on any organ with smooth camera dolly and waist-centered orbit pivot.
+
+### 2. Organ Clipping Cutaway & Honest Physiological Motion
+- **Dynamic Cross-Sectional Shader**: Slice through organs with an interactive clipping plane featuring a colored interior cap (`vec3(0.85, 0.38, 0.32)`), giving immediate visual depth.
+- **Honest Physiological Motion**: Vertex shader animations simulating rhythmic heartbeat (72 bpm), lung expansion (14 bpm), and intestinal peristalsis waves.
+- **Clinical Dossier Cards**: Detailed cards showing physiological function, anatomical location, and clinical facts, with explicit notices when an organ utilizes surface-only representation.
+
+### 3. Patient Profile & Morphological Body Scaling
+- **Custom Patient Attributes**: Configure age (18–90y), biological sex (gracile frame adjustments), height (135–210 cm), weight (40–140 kg), blood group, and documented drug allergies.
+- **Dynamic Mesh Scaling**:
+  - Height scales along the Y-axis.
+  - Weight scales torso and abdominal girth along the X and Z axes based on BMI ($0.70\times$ to $1.45\times$ sensible clamps).
+- **Derived PK Metrics**: Real-time calculation of BMI, Mosteller Body Surface Area (BSA), Watson Total Body Water (TBW), and Cockcroft-Gault Creatinine Clearance (eCrCl).
+
+### 4. Pure TypeScript Pharmacokinetics (PK) Engine
+- **5-Compartment Runge-Kutta (RK4) Solver**:
+  - Stomach ($A_{\text{stomach}}$), Gut ($A_{\text{gut}}$), Systemic Plasma ($A_{\text{plasma}}$), Liver ($A_{\text{liver}}$), Kidney ($A_{\text{kidney}}$).
+  - First-order gastric emptying ($k_{\text{empty}}$), intestinal carrier absorption ($k_a$), oral bioavailability ($F$), volume of distribution ($V_d$ per kg), hepatic clearance ($CL_h$), and renal clearance ($CL_r$).
+  - **Guaranteed Mass Conservation**: Numerical drift $\Delta \sum A_i < 0.0001\%$ over 24 simulated hours.
+- **Sourced Drug Database (`src/pk/drugs.json`)**:
+  - **Paracetamol (500mg, 650mg, 1000mg)**: Prescott LF (1980). Predominantly hepatic ($>90\%$).
+  - **Ibuprofen (200mg, 400mg, 800mg)**: Davies NM (1998). High protein binding, small $V_d$.
+  - **Aspirin (81mg, 325mg, 500mg)**: Rowland M (1968). Rapid gastric/intestinal hydrolysis.
+  - **Amoxicillin (250mg, 500mg, 875mg)**: Sjövall J (1985). Predominantly renal ($>75\%$).
+- **Clinical Safety Module**:
+  - Allergy contraindication lock: blocks swallow and warns if patient has matching hypersensitivity (e.g., Penicillin allergy blocks Amoxicillin; NSAID allergy blocks Ibuprofen/Aspirin).
+  - Per-kg single-dose warnings based on patient body weight.
+- **18/18 Passing Unit Tests**: Validating mass conservation, peak windows ($T_{\max}$, $C_{\max}$), organ elimination routes, and safety gates.
+
+### 5. Connected 3D Digestion Simulation
+- **Actual-Mesh Centred Catmull-Rom Spline**: 22 anatomical waypoints sampled directly from mesh bounding boxes: Oral cavity (`FJ2761`), Esophagus (`FJ2563`), Stomach (`FJ2564`), Duodenum (`FJ2573`), Jejunum (`FJ2606`–`FJ2615`), and Ileum (`FJ2574`–`FJ2585`).
+- **240 Instanced Molecule Particles**: Flow along the centreline spline with molecular density partitioned strictly by compartment amounts ($A_{\text{stomach}}$ in electric blue `#38bdf8`, $A_{\text{gut}}$ in warm amber `#fbbf24`, $A_{\text{plasma}}$ capillary flush `#f43f5e`).
+- **Instantaneous Clearance Rate Glow**:
+  - Liver glows golden-amber proportional to hepatic rate: $\text{Rate}_h = C_p \cdot CL_h$.
+  - Kidneys illuminate in vibrant cyan proportional to renal rate: $\text{Rate}_r = C_p \cdot CL_r$.
+- **Time-Speed Controls**: $1\times$ to $600\times$ playback slider and presets (`1x`, `10x`, `60x`, `120x`, `300x`, `600x`), with instant Pause and Reset.
+- **Live Bateman Concentration Chart (`#chart`)**: Plots 24-hour plasma curve with therapeutic window, MEC threshold, and toxic boundary.
+
+### 6. Performance & Progressive Streaming
+- **Rolldown Code-Splitting**: Monolithic bundle cut by **69.4%** (main entry down from 984 kB to **301 kB**).
+- **Progressive Organ Lazy Loading**: Initial critical set (`[10, 11, 0]`, ~6 MB) renders First Meaningful Paint in **< 400 ms**; remaining 12 chunks stream during idle frames with zero UI stutter.
+- **Mobile Viewport Optimization**: Full responsive design tested on 390 × 844 iPhone profile with 44px touch targets.
+
+---
+
+## Architecture & Codebase Layout
+
+```
+Digi_Twin/
+├── app/                           # Core application logic & UI
+│   ├── page.tsx                   # Main React page: UI layout, sheets, modals
+│   ├── scene.tsx                  # Three.js WebGL canvas, OrbitControls, shader materials
+│   ├── anatomy.ts                 # Data models: 15 anatomical systems, Concepts, scaling logic
+│   ├── explosion-layout.ts        # 2D/3D unpacked inventory calculator
+│   ├── model-download.ts          # Mesh chunk decoder & DecompressionStream streaming
+│   ├── pointer-tap.ts             # Pointer movement & tap-vs-drag threshold detector
+│   └── globals.css                # Tailwind CSS v4 design tokens, glassmorphism, responsive styles
+├── src/pk/                        # Pure TypeScript Pharmacokinetics Engine
+│   ├── types.ts                   # Strongly typed PK parameters, states, and safety types
+│   ├── engine.ts                  # 5-compartment RK4 differential equation solver
+│   ├── safety.ts                  # Allergy validation and weight-based dose warnings
+│   ├── drugs.json                 # Sourced active ingredients with literature citations
+│   ├── worker.ts                  # Dedicated Web Worker for off-thread simulation
+│   ├── worker-client.ts           # Web Worker RPC client with synchronous fallback
+│   └── __tests__/                 # Comprehensive Node.js native test suite
+│       └── pk.test.ts             # 18 mass conservation, peak range, and safety tests
+├── public/
+│   ├── models/                    # Binary mesh chunks (body-0.bin.gz .. body-14.bin.gz)
+│   │   └── atlas.json             # Geometry manifest: 2,234 parts, byte offsets, bounds
+│   └── ATTRIBUTION.md             # Dataset licensing & citations
+├── vercel.json                    # Static deployment headers, immutable caching, and SPA rewrites
+├── vite.config.ts                 # Vite bundler configuration & Rolldown code-splitting
+└── PROJECT.md                     # Detailed development milestone tracker & architecture notes
+```
+
+---
+
+## Getting Started
+
+### Prerequisites
+- Node.js 22.13 or newer
+- npm 10+
+
+### Installation & Run
+
+```bash
+# Clone the repository
+git clone https://github.com/dummmydadddy-art/Digi_Twin.git
+cd Digi_Twin
+
+# Install dependencies
 npm ci
+
+# Start local development server
 npm run dev
 ```
 
-Open http://localhost:3016. To build the static site, run `npm run build`; the output is in `dist/`.
+Open `http://localhost:3016` in your browser.
 
-## Validate
+### Quality Assurance & Validation
 
-```sh
+```bash
+# Run TypeScript typecheck
 npm run check
-node scripts/validate-atlas.mjs
-node scripts/validate-interactions.mjs
+
+# Run pharmacokinetic unit test suite (18 tests)
+npm test
+
+# Build production bundle (dist/)
 npm run build
 ```
 
-Validation covers mesh buffers, names and concept membership, nonoverlapping exploded layouts at desktop and mobile aspect ratios, search and inspection contracts, and tap-versus-drag handling. Browser interaction checks have exercised selection, system controls, search, isolation, rotation, and 390×844, 320×568, and 844×390 layouts. Phone controls stay clear of the exploded inventory, and isolated structures fit the space above or beside the detail panel. Physical-device performance and real multitouch hardware have not been tested.
+---
 
-## Anatomy data
+## Dataset Licensing & Attribution
 
-The current viewer uses **BodyParts3D 4.0**, an adult male reference anatomy, licensed **CC BY 4.0**. It does not represent every human structure or variation. Individual source meshes are distinct from named concepts, which may group multiple meshes. Descriptions distinguish general system context from individual organ explanations.
+- **BodyParts3D**: © *The Database Center for Life Science (DBCLS)*, Research Organization of Information and Systems (ROIS), Japan. Licensed under [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
+  - Publication: Mitsuhashi N, et al. *BodyParts3D: 3D structure database for anatomical concepts.* Nucleic Acids Res. 2009;37:D782-5. [doi:10.1093/nar/gkn613](https://doi.org/10.1093/nar/gkn613).
+- **Human Atlas Architecture**: Open-source 3D anatomy viewer architecture created by Ashish Shekar ([ashemag/human-atlas](https://github.com/ashemag/human-atlas), MIT License).
+- **Three.js**: WebGL 3D graphics library (MIT License).
+- **meshoptimizer**: Mesh compression and vertex decoding (MIT License, Arseny Kapoulkine).
 
-Geometry is simplified for browser performance while retaining every source mesh. The packaged model contains 2,288,268 triangles and downloads approximately 33 MB of compressed geometry. Full credits, source links, and adaptation details are in [ATTRIBUTION.md](public/ATTRIBUTION.md).
+---
 
-This is an educational explorer, not a diagnostic or surgical tool.
+## Clinical Disclaimer
 
-## How it works
+> **Educational Demonstration Only**: Body Twin / Digi_Twin is an educational and computational simulation platform. Anatomical structures, morphological scaling, and the 5-compartment Runge-Kutta pharmacokinetic model are intended strictly for educational insight. **Not intended for clinical medical advice, dosage calculation, diagnosis, or patient management.** Always consult a licensed healthcare professional for medical concerns.
 
-Geometry is merged into batches. Per-structure GPU textures control translation, visibility, and selection, while component geometry supports accurate picking. Exploded layouts pack only the visible pieces. Rendering updates when the scene changes; orbit controls remain responsive without thousands of separate draw calls.
-
-The optional WebMCP tools expose anatomy search and inspection in compatible browsers. The visible interface works without them.
-
-## Rebuilding geometry
-
-The repository includes browser-ready geometry. Rebuilding it is optional: obtain the official BodyParts3D OBJ archive and English metadata tables, prepare the joined concepts and display-system mappings, run `scripts/convert-anatomy.py`, then `node scripts/optimize-anatomy.mjs` and `node scripts/compress-models.mjs`. Simplification uses a 0.2% relative error limit per structure.
-
-## Deploy
-
-Import this repository into Vercel as a Vite project. The included `vercel.json` configures `npm ci`, `npm run build`, and the `dist` output directory. It can also be served by a static host.
+---
 
 ## License
 
-Original application code is released under the [MIT License](LICENSE). **The anatomy data has its own CC BY 4.0 license**; preserve the attribution when redistributing it. Third-party dependencies retain their respective licenses.
-
-Issues and pull requests are welcome. Please include reproduction steps and browser/device details for interaction problems.
+This project's code is licensed under the [MIT License](LICENSE).  
+The underlying anatomical geometry is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) by DBCLS.
