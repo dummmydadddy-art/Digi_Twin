@@ -1,0 +1,198 @@
+[
+  {
+    "id": "paracetamol",
+    "name": "Paracetamol",
+    "genericName": "Acetaminophen (APAP)",
+    "therapeuticClass": "Analgesic & Antipyretic",
+    "standardDoseMg": 500,
+    "availableDosesMg": [500, 650, 1000],
+    "maxSingleDoseMg": 1000,
+    "maxDailyDoseMg": 4000,
+    "maxSingleDosePerKg": 15.0,
+    "contraindicatedAllergy": "none",
+    "clearanceRoute": "hepatic",
+    "bioavailability": 0.88,
+    "kEmpty": 2.77,
+    "ka": 2.20,
+    "vdPerKg": 0.95,
+    "clPerKg": 0.28,
+    "hepaticFraction": 0.95,
+    "renalFraction": 0.05,
+    "halfLifeHours": 2.3,
+    "targetRangeMgL": {
+      "min": 10.0,
+      "max": 20.0
+    },
+    "toxicThresholdMgL": 150.0,
+    "documentedPeak": {
+      "tmaxHours": {
+        "min": 0.5,
+        "max": 2.0
+      },
+      "cmaxRangeForStandardDoseMgL": {
+        "min": 4.0,
+        "max": 12.0
+      }
+    },
+    "sources": {
+      "bioavailability": "Prescott LF. Clin Pharmacokinet. 1980; 5(3):211-231 (oral F: 75-90%, mean 88%).",
+      "kEmpty": "Heading RC et al. Br J Clin Pharmacol. 1973; 47(2):415-421 (gastric half-emptying t1/2 ~15 min in fasted state -> k = ln(2)/0.25h = 2.77/h).",
+      "ka": "Goodman & Gilman's The Pharmacological Basis of Therapeutics, 14th Ed., Chap 34 (rapid duodenal absorption).",
+      "vdPerKg": "Rowland & Tozer's Clinical Pharmacokinetics and Pharmacodynamics, 5th Ed. (Vd: 0.8-1.1 L/kg, mean 0.95 L/kg).",
+      "clPerKg": "Forrest JA et al. Clin Pharmacokinet. 1982; 7(2):93-107 (total systemic clearance ~5 mL/min/kg = 0.28 L/h/kg).",
+      "hepaticFraction": "Goodman & Gilman, 14th Ed. (>90-95% glucuronide and sulfate conjugation in liver).",
+      "renalFraction": "Goodman & Gilman, 14th Ed. (<5% excreted unchanged in urine).",
+      "halfLifeHours": "Rowland & Tozer, 5th Ed. (elimination t1/2 in healthy adult: 2.0-3.0 h).",
+      "targetRangeMgL": "Rumack BH, Matthew H. Pediatrics. 1975; 55(6):871-876 (therapeutic analgesic plasma levels 10-20 mg/L).",
+      "toxicThresholdMgL": "Rumack-Matthew Nomogram (4-hour post-ingestion hepatotoxic threshold line: 150 mg/L).",
+      "documentedPeak": "Prescott LF. Clin Pharmacokinet. 1980; 5(3):211-231: Tmax 0.5-2.0 h, Cmax 4.0-12.0 mg/L for 500 mg dose in 70 kg adult."
+    }
+  },
+  {
+    "id": "ibuprofen",
+    "name": "Ibuprofen",
+    "genericName": "Ibuprofen (2-(4-isobutylphenyl)propionic acid)",
+    "therapeuticClass": "Non-Steroidal Anti-Inflammatory Drug (NSAID)",
+    "standardDoseMg": 400,
+    "availableDosesMg": [200, 400, 600, 800],
+    "maxSingleDoseMg": 800,
+    "maxDailyDoseMg": 3200,
+    "maxSingleDosePerKg": 10.0,
+    "contraindicatedAllergy": "nsaids",
+    "clearanceRoute": "hepatic",
+    "bioavailability": 0.95,
+    "kEmpty": 2.50,
+    "ka": 1.80,
+    "vdPerKg": 0.15,
+    "clPerKg": 0.055,
+    "hepaticFraction": 0.90,
+    "renalFraction": 0.10,
+    "halfLifeHours": 2.0,
+    "targetRangeMgL": {
+      "min": 15.0,
+      "max": 30.0
+    },
+    "toxicThresholdMgL": 100.0,
+    "documentedPeak": {
+      "tmaxHours": {
+        "min": 1.0,
+        "max": 2.5
+      },
+      "cmaxRangeForStandardDoseMgL": {
+        "min": 20.0,
+        "max": 45.0
+      }
+    },
+    "sources": {
+      "bioavailability": "Davies NM. Clin Pharmacokinet. 1998; 34(2):101-154 (F > 90-95% from oral tablet).",
+      "kEmpty": "assumption: standard fasted gastric motility (t1/2 ~16.6 min -> k = 2.50/h).",
+      "ka": "FDA NDA 018997 Clinical Pharmacology Review (absorption rate constant ka ~1.6-2.0/h).",
+      "vdPerKg": "Davies NM 1998; Goodman & Gilman, 14th Ed. (Vd: 0.12-0.18 L/kg due to extensive >99% albumin binding).",
+      "clPerKg": "Albert KS, Gernaat CM. Am J Med. 1984; 77(1A):40-46 (plasma clearance ~0.9 mL/min/kg = 0.055 L/h/kg).",
+      "hepaticFraction": "Davies NM 1998 (metabolized by CYP2C9/CYP2C8 to inactive hydroxy- and carboxy-ibuprofen).",
+      "renalFraction": "Davies NM 1998 (<10% excreted unchanged by glomerular filtration).",
+      "halfLifeHours": "Davies NM 1998 (mean terminal t1/2: 1.8-2.4 h).",
+      "targetRangeMgL": "Goodman & Gilman, 14th Ed. (therapeutic plasma levels 15-30 mg/L for anti-inflammatory efficacy).",
+      "toxicThresholdMgL": "Hall AH et al. Ann Emerg Med. 1986; 15(11):1308-1313 (CNS/renal toxicity correlation >100 mg/L).",
+      "documentedPeak": "Gillespie WR et al. J Pharmacokinet Biopharm. 1982; 10(4):369-380: Tmax 1.0-2.5 h, Cmax 20-45 mg/L for 400 mg in 70 kg adult."
+    }
+  },
+  {
+    "id": "aspirin",
+    "name": "Aspirin",
+    "genericName": "Acetylsalicylic Acid (ASA)",
+    "therapeuticClass": "Salicylate & Antiplatelet NSAID",
+    "standardDoseMg": 325,
+    "availableDosesMg": [81, 325, 500, 650],
+    "maxSingleDoseMg": 1000,
+    "maxDailyDoseMg": 4000,
+    "maxSingleDosePerKg": 15.0,
+    "contraindicatedAllergy": "nsaids",
+    "clearanceRoute": "hepatic",
+    "bioavailability": 0.68,
+    "kEmpty": 3.00,
+    "ka": 2.80,
+    "vdPerKg": 0.18,
+    "clPerKg": 0.45,
+    "hepaticFraction": 0.80,
+    "renalFraction": 0.20,
+    "halfLifeHours": 0.32,
+    "targetRangeMgL": {
+      "min": 5.0,
+      "max": 20.0
+    },
+    "toxicThresholdMgL": 100.0,
+    "documentedPeak": {
+      "tmaxHours": {
+        "min": 0.3,
+        "max": 1.0
+      },
+      "cmaxRangeForStandardDoseMgL": {
+        "min": 3.0,
+        "max": 12.0
+      }
+    },
+    "sources": {
+      "bioavailability": "Rowland M, Riegelman S. J Pharm Sci. 1968; 57(8):1313-1319 (intact ASA bioavailability 68% due to first-pass mucosal and hepatic esterases).",
+      "kEmpty": "assumption: rapid gastric dissolution in acidic environment (t1/2 ~13.8 min -> k = 3.0/h).",
+      "ka": "Needleman P et al. Goodman & Gilman, 10th Ed. (rapid passive gastric/duodenal absorption).",
+      "vdPerKg": "Levy G. Pediatrics. 1978; 62(5 Pt 2 Suppl):867-872 (apparent Vd of intact ASA ~0.15-0.20 L/kg).",
+      "clPerKg": "Rowland & Tozer, 5th Ed. (total clearance of parent ASA ~0.45 L/h/kg driven by rapid esterase hydrolysis).",
+      "hepaticFraction": "Goodman & Gilman, 14th Ed. (80% hydrolyzed by hepatic/plasma esterases to salicylate).",
+      "renalFraction": "Goodman & Gilman, 14th Ed. (20% renal clearance of intact ester/glucuronide).",
+      "halfLifeHours": "Rowland M, Riegelman S. 1968 (parent ASA elimination half-life ~15-20 min = 0.25-0.35 h).",
+      "targetRangeMgL": "Goodman & Gilman, 14th Ed. (antiplatelet and acute analgesic window 5-20 mg/L parent ASA).",
+      "toxicThresholdMgL": "Done AK. Pediatrics. 1960; 26(5):800-807 (Done nomogram acute salicylate toxicity threshold >100 mg/L).",
+      "documentedPeak": "Rowland M, Riegelman S. 1968; Flower RJ et al. Goodman & Gilman 7th Ed: intact acetylsalicylic acid Tmax 0.3-1.0 h (20-45 min), Cmax 3.0-12.0 mg/L for 325 mg in 70 kg adult."
+    }
+  },
+  {
+    "id": "amoxicillin",
+    "name": "Amoxicillin",
+    "genericName": "Amoxicillin Trihydrate",
+    "therapeuticClass": "Aminopenicillin Beta-Lactam Antibiotic",
+    "standardDoseMg": 500,
+    "availableDosesMg": [250, 500, 875, 1000],
+    "maxSingleDoseMg": 1000,
+    "maxDailyDoseMg": 3000,
+    "maxSingleDosePerKg": 20.0,
+    "contraindicatedAllergy": "penicillin",
+    "clearanceRoute": "renal",
+    "bioavailability": 0.85,
+    "kEmpty": 2.40,
+    "ka": 1.40,
+    "vdPerKg": 0.30,
+    "clPerKg": 0.18,
+    "hepaticFraction": 0.20,
+    "renalFraction": 0.80,
+    "halfLifeHours": 1.2,
+    "targetRangeMgL": {
+      "min": 4.0,
+      "max": 10.0
+    },
+    "toxicThresholdMgL": 50.0,
+    "documentedPeak": {
+      "tmaxHours": {
+        "min": 1.0,
+        "max": 2.5
+      },
+      "cmaxRangeForStandardDoseMgL": {
+        "min": 5.0,
+        "max": 12.0
+      }
+    },
+    "sources": {
+      "bioavailability": "Sjövall J et al. Eur J Clin Pharmacol. 1985; 29(4):439-444 (acid-stable oral bioavailability 75-90%, mean 85%).",
+      "kEmpty": "assumption: standard liquid/solid gastric transit (t1/2 ~17.3 min -> k = 2.40/h).",
+      "ka": "Westphal JF et al. Clin Pharmacokinet. 1994; 27(4):300-333 (active PEPT1 carrier transport absorption ka ~1.2-1.6/h).",
+      "vdPerKg": "Arancibia A et al. Int J Clin Pharmacol Ther Toxicol. 1980; 18(10):430-433 (extracellular fluid Vd ~0.25-0.35 L/kg).",
+      "clPerKg": "Spyker DA et al. Antimicrob Agents Chemother. 1977; 11(1):132-141 (total clearance ~3 mL/min/kg = 0.18 L/h/kg).",
+      "hepaticFraction": "Amoxil FDA Package Insert (NDA 50-542) (minor ~10-20% hepatic conversion to penicilloic acid).",
+      "renalFraction": "Amoxil FDA Package Insert (NDA 50-542) (~70-80% excreted unchanged in urine via filtration and OAT secretion).",
+      "halfLifeHours": "Spyker DA et al. 1977 (terminal elimination t1/2: 1.0-1.4 h in normal renal function).",
+      "targetRangeMgL": "Neu HC. Antimicrob Agents Chemother. 1974; 6(2):139-144 (effective antibacterial bactericidal MIC coverage 4-10 mg/L).",
+      "toxicThresholdMgL": "assumption: wide beta-lactam safety margin; neurotoxicity/seizure threshold rare below 50 mg/L.",
+      "documentedPeak": "Neu HC 1974; Sjövall J 1985: Tmax 1.0-2.5 h, Cmax 5-12 mg/L for 500 mg dose in 70 kg adult."
+    }
+  }
+]

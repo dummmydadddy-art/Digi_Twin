@@ -196,12 +196,24 @@ BodyParts3D distinguishes between **Parts** (individual raw 3D mesh objects in t
 - [x] 3D anatomy root group, raycaster bounding boxes, and camera pivot target dynamically synced with scale factors.
 - [x] Verified in browser with 5 automated screenshot checkpoints.
 
-### Phase 5: Pharmacokinetics & Drug Simulation Engine (Next Phase)
-- [ ] Sourced drug library (Paracetamol, Ibuprofen, Aspirin, Amoxicillin) with explicit parameter citations.
-- [ ] Oral ingestion path animation: mouth > esophagus > stomach > small intestine > bloodstream.
-- [ ] Real-time one-compartment PK differential solver with liver clearance & renal excretion visual highlights.
-- [ ] Dynamic Bateman concentration chart (`canvas`) and therapeutic effect progress bar.
-- [ ] Safety warnings: allergy contraindication block, weight-based dose threshold warnings.
+### Phase 5: Pharmacokinetics Engine & Drug Simulation (In Progress - Engine Complete)
+- [x] Pure TypeScript Pharmacokinetic Engine (`src/pk/`):
+  - 5 physiological compartments: Stomach ($A_{\text{stomach}}$), Gut ($A_{\text{gut}}$), Systemic Plasma ($A_{\text{plasma}}$), Liver ($A_{\text{liver}}$), Kidney ($A_{\text{kidney}}$), plus unabsorbed lumen residue.
+  - First-order stomach emptying ($k_{\text{empty}}$), intestinal carrier/passive absorption ($k_a$), oral bioavailability ($F$), volume of distribution ($V_d$ per kg), hepatic clearance ($CL_h$), and Cockcroft-Gault-modulated renal clearance ($CL_r$).
+  - 4th-Order Runge-Kutta (RK4) numerical ODE solver with guaranteed mathematical mass conservation ($\Delta \sum A_i = 0$, error $< 0.0001\%$).
+  - Web Worker integration (`worker.ts` & `worker-client.ts`) allowing long-running multi-hour simulations to compute off the main UI/render thread.
+- [x] Sourced Drug Catalog (`src/pk/drugs.json`):
+  - Paracetamol, Ibuprofen, Aspirin, Amoxicillin with literature citations (Prescott LF, Davies NM, Rowland M, Sjövall J, Goodman & Gilman, FDA NDAs, Rowland & Tozer) and explicit `"assumption: ..."` tags for fasted gastric motility.
+  - Clinical therapeutic windows, toxic thresholds, and literature $T_{\max}$ / $C_{\max}$ ranges.
+- [x] Clinical Safety Module (`src/pk/safety.ts`):
+  - Allergy contraindication block: locks simulation if patient has matching documented hypersensitivity (e.g. penicillin blocks amoxicillin; NSAIDs block aspirin and ibuprofen).
+  - Per-kg weight-adjusted dose warning: flags doses exceeding safe single-dose thresholds (e.g. $> 15\text{ mg/kg}$ for paracetamol, $> 10\text{ mg/kg}$ for ibuprofen).
+- [x] Comprehensive Unit Test Suite (`src/pk/__tests__/pk.test.ts`):
+  - 18/18 tests passing across 4 suites: mass conservation across 24 hours, patient weight scaling (45kg to 120kg), $T_{\max}$ and $C_{\max}$ literature validation, organ clearance routes (hepatic vs renal predominance), allergy blocks, and per-kg dose warnings.
+- [ ] 3D Oral Ingestion Spline & Particle Transit (mouth > esophagus > stomach > small intestine > blood).
+- [ ] Real-time Liver and Kidney clearance illumination in Three.js shaders.
+- [ ] Live Bateman concentration chart (`#chart`) and therapeutic effect bar (`#eb`).
+- [ ] Drug selection & simulation controls UI.
 
 ### Phase 6: 60 FPS Polish & Mobile/Desktop Optimization
 - [ ] GPU shader optimization, frame budget auditing, and memory cleanup.
