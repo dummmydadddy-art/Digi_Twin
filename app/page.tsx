@@ -1,7 +1,7 @@
 import {flushSync} from 'react-dom';
 import {registerAtlasTools} from './agent-tools';
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {Activity,AlertTriangle,ArrowUpRight,CheckCircle2,ChevronRight,FastForward,Focus,Info,Layers3,Pause,Pill,Play,RotateCcw,RotateCw,Search,ShieldAlert,Sparkles,User,X} from 'lucide-react';
+import {Activity,AlertTriangle,ArrowUpRight,CheckCircle2,ChevronRight,FastForward,Focus,HeartPulse,Info,Layers3,Pause,Pill,Play,RotateCcw,RotateCw,Search,ShieldAlert,Sparkles,User,X} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Badge} from '@/components/ui/badge';
 import {Slider} from '@/components/ui/slider';
@@ -14,7 +14,7 @@ import {DRUGS,checkDrugSafety,getDrugById} from '@/src/pk/safety';
 import {runSimulation} from '@/src/pk/engine';
 import type {DrugDefinition,DrugId,PatientPkParams,PkCompartmentState,SafetyCheckResult,SimulationResult} from '@/src/pk/types';
 
-const initial:SceneState={explode:0,peel:0,cutaway:true,visible:DEFAULT_VISIBLE,selected:[],isolate:false,view:'three-quarter',rotate:false,reset:0,patient:DEFAULT_PATIENT_PROFILE};
+const initial:SceneState={explode:0,peel:0,cutaway:true,visible:DEFAULT_VISIBLE,selected:[],isolate:false,view:'three-quarter',rotate:false,motion:true,reset:0,patient:DEFAULT_PATIENT_PROFILE};
 
 function getPeelTierLabel(peel:number=0):string{
  const p=peel??0;
@@ -45,7 +45,7 @@ export default function Home(){
  },[]);
 
  const reset=()=>{
-  setState(s=>({...initial,cutaway:true,visible:DEFAULT_VISIBLE,patient:s.patient,simulation:{active:false,progress:0,stomachLevel:0,gutLevel:0,plasmaLevel:0,liverIntensity:0,kidneyIntensity:0,hepaticRateMgH:0,renalRateMgH:0,stomachMg:0,gutMg:0,plasmaMg:0},reset:s.reset+1}));
+  setState(s=>({...initial,cutaway:true,visible:DEFAULT_VISIBLE,patient:s.patient,motion:s.motion??true,simulation:{active:false,progress:0,stomachLevel:0,gutLevel:0,plasmaLevel:0,liverIntensity:0,kidneyIntensity:0,hepaticRateMgH:0,renalRateMgH:0,stomachMg:0,gutMg:0,plasmaMg:0},reset:s.reset+1}));
   setChosen(null);setDetails(false);setPanel(null);setPatientOpen(false);setSimPanelOpen(false);setAbout(false);setSimRunning(false);setSimPaused(false);setSimTimeHours(0);setSimResult(null);
  };
 
@@ -502,6 +502,17 @@ export default function Home(){
    </Button>
    <Button
     variant="ghost"
+    className={`motion-trigger ${state.motion !== false ? 'active' : 'paused'}`}
+    onClick={() => setState(s => ({ ...s, motion: s.motion === false }))}
+    aria-label={state.motion !== false ? "Stop organ movement (heartbeat, respiration, peristalsis)" : "Start organ movement"}
+    title={state.motion !== false ? "Organ movement (heartbeat, respiration, peristalsis) · Active (click to stop)" : "Organ movement (heartbeat, respiration, peristalsis) · Stopped (click to start)"}
+   >
+    <HeartPulse size={18} className={state.motion !== false ? 'motion-heart-pulse' : 'text-slate-400'} />
+    <span className="desktop-only">{state.motion !== false ? 'Motion' : 'Motion Paused'}</span>
+    {state.motion !== false && <span className="status-dot" style={{ background: '#e11d48' }} />}
+   </Button>
+   <Button
+    variant="ghost"
     className={`patient-trigger ${patientOpen ? 'active' : ''}`}
     onClick={() => { setDetails(false); setPanel(null); setAbout(false); setSimPanelOpen(false); setPatientOpen(o => !o); }}
     aria-label="Open Patient Profile"
@@ -764,7 +775,7 @@ export default function Home(){
   )}
 
   {panel==='search'&&<section className="search-panel glass" aria-label="Find anatomy"><div className="panel-heading"><span>Find a structure</span><Button variant="ghost" className="icon-button" onClick={()=>setPanel(null)} aria-label="Close search"><X size={18}/></Button></div><Combobox<Concept> items={results} value={null} onValueChange={value=>{if(value)choose(value);}} inputValue={query} onInputValueChange={setQuery} itemToStringLabel={c=>c.name} filter={null} open onOpenChange={open=>{if(!open)setPanel(null);}}><ComboboxInput autoFocus placeholder="Heart, femur, cranial nerve…" aria-label="Search named anatomical structures" showTrigger={false}/><ComboboxContent className="anatomy-search-results"><ComboboxEmpty>No structures match your search.</ComboboxEmpty><ComboboxList>{(c:Concept)=><ComboboxItem key={c.id} value={c}><span className="search-result-name">{c.name}</span><span className="small-number">{c.elements.length} {c.elements.length===1?'piece':'pieces'}</span></ComboboxItem>}</ComboboxList></ComboboxContent></Combobox><p className="search-note">{query?'Showing up to 80 matches. Refine your search to find smaller structures.':'Start with a major organ, or search every named structure.'}</p></section>}
-  <nav className="view-controls glass" aria-label="Camera controls">{(['three-quarter','front','side','back'] as View[]).map((v,i)=><Button variant="ghost" key={v} className={state.view===v?'active':''} aria-pressed={state.view===v} disabled={state.explode>.8&&v!=='front'} onClick={()=>setState(s=>({...s,view:v,rotate:false}))} title={`${v} view`} aria-label={`${v} view`}><span>{['¾','F','S','B'][i]}</span></Button>)}<i/><Button variant="ghost" disabled={state.explode>=.4} aria-label={state.rotate?'Pause rotation':'Rotate body'} title="Auto rotate" className={state.rotate?'active':''} onClick={()=>setState(s=>({...s,rotate:!s.rotate}))}>{state.rotate?<Pause size={17}/>:<RotateCw size={18}/>}</Button><Button variant="ghost" aria-label="Reset view and layers" title="Reset (Esc)" onClick={reset}><RotateCcw size={17}/></Button></nav>
+  <nav className="view-controls glass" aria-label="Camera and motion controls">{(['three-quarter','front','side','back'] as View[]).map((v,i)=><Button variant="ghost" key={v} className={state.view===v?'active':''} aria-pressed={state.view===v} disabled={state.explode>.8&&v!=='front'} onClick={()=>setState(s=>({...s,view:v,rotate:false}))} title={`${v} view`} aria-label={`${v} view`}><span>{['¾','F','S','B'][i]}</span></Button>)}<i/><Button variant="ghost" disabled={state.explode>=.4} aria-label={state.rotate?'Pause rotation':'Rotate body'} title="Auto rotate" className={state.rotate?'active':''} onClick={()=>setState(s=>({...s,rotate:!s.rotate}))}>{state.rotate?<Pause size={17}/>:<RotateCw size={18}/>}</Button><Button variant="ghost" aria-label={state.motion!==false?'Stop organ motion':'Start organ motion'} title={state.motion!==false?'Organ motion (heartbeat, respiration, peristalsis) · Active (click to stop)':'Organ motion (heartbeat, respiration, peristalsis) · Stopped (click to start)'} className={`motion-btn ${state.motion!==false?'active':''}`} onClick={()=>setState(s=>({...s,motion:s.motion===false}))}><HeartPulse size={17} className={state.motion!==false?'motion-heart-pulse':''}/></Button><Button variant="ghost" aria-label="Reset view and layers" title="Reset (Esc)" onClick={reset}><RotateCcw size={17}/></Button></nav>
   <div className="scene-caption"><span className="caption-line"/><span>{state.isolate?(chosen?.name??'SELECTED STRUCTURE'):state.explode>.95?'ANATOMICAL INVENTORY':state.explode>.05?'SEPARATED STRUCTURES':(state.peel??0)>.05?`PEEL: ${getPeelTierLabel(state.peel).toUpperCase()} LAYER`:`${patient.age}YO ${patient.sex.toUpperCase()} · ${patient.heightCm}CM · ${patient.weightKg}KG · APPROXIMATION`}</span><span className="caption-line"/></div>
   <div className="bottom-dock glass">
    <Button variant="ghost" className="mobile-only dock-layers" onClick={()=>openPanel('layers')} aria-label="Open system layers"><Layers3 size={20}/><span>Systems</span></Button>

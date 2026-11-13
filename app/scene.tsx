@@ -130,10 +130,12 @@ export default function AnatomyScene({atlas,state,onSelect,onPeelChange,onProgre
 
   const peelUniform={value:0},peelCenterUniform={value:new T.Vector3(0,.88,0)},peelRadiusUniform={value:0};
   const timeUniform={value:0},cutawayUniform={value:0},focusCenterUniform={value:new T.Vector3(0,.88,0)};
+  const motionUniform={value:1.0};
   let currentPeel=0,targetPeel=0,currentPeelRadius=0,targetPeelRadius=0;
   const currentPeelCenter=new T.Vector3(0,.88,0),targetPeelCenter=new T.Vector3(0,.88,0);
   let flyingTo:{target:T.Vector3;cameraPos:T.Vector3}|null=null;
   let glowActive=false;
+  let currentMotion=1.0;
 
   const materialFor=(system:string)=>{
    const tier=getSystemTier(system as SystemId);
@@ -143,27 +145,29 @@ export default function AnatomyScene({atlas,state,onSelect,onPeelChange,onProgre
    m.onBeforeCompile=shader=>{
     shader.uniforms.partState={value:partTexture};shader.uniforms.selectionState={value:selectionTexture};shader.uniforms.glowState={value:glowTexture};shader.uniforms.stateWidth={value:width};
     shader.uniforms.uPeel=peelUniform;shader.uniforms.uPeelCenter=peelCenterUniform;shader.uniforms.uPeelRadius=peelRadiusUniform;shader.uniforms.uTier={value:tier};
-    shader.uniforms.uTime=timeUniform;shader.uniforms.uMotionType={value:motionType};
+    shader.uniforms.uTime=timeUniform;shader.uniforms.uMotionType={value:motionType};shader.uniforms.uMotionEnabled=motionUniform;
     shader.uniforms.uCutawayEnabled=cutawayUniform;shader.uniforms.uFocusCenter=focusCenterUniform;
 
-    shader.vertexShader='attribute float partIndex; uniform sampler2D partState; uniform sampler2D selectionState; uniform float stateWidth; uniform float uTime; uniform float uMotionType; varying float partVisible; varying float partSelected; varying vec3 vWorldPosition; varying vec2 vStateUv;\n'+shader.vertexShader;
+    shader.vertexShader='attribute float partIndex; uniform sampler2D partState; uniform sampler2D selectionState; uniform float stateWidth; uniform float uTime; uniform float uMotionType; uniform float uMotionEnabled; varying float partVisible; varying float partSelected; varying vec3 vWorldPosition; varying vec2 vStateUv;\n'+shader.vertexShader;
     shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>',`#include <begin_vertex>
 vec2 stateUv = vec2((partIndex + 0.5) / stateWidth, 0.5);
 vec4 state = texture2D(partState, stateUv);
 transformed += state.xyz;
 
 // Honest, physiological motion
-if (uMotionType > 0.5 && uMotionType < 1.5) {
- float beat = sin(uTime * 7.54);
- float pulse = pow(max(0.0, beat), 3.0) * 0.040 - pow(max(0.0, -beat), 2.0) * 0.015;
- transformed += normal * pulse;
-} else if (uMotionType > 1.5 && uMotionType < 2.5) {
- float breath = sin(uTime * 1.45) * 0.022;
- transformed.x += sign(transformed.x) * breath;
- transformed.z += breath * 0.65;
-} else if (uMotionType > 2.5 && uMotionType < 3.5) {
- float wave = sin(transformed.y * 20.0 - uTime * 3.0) * 0.012;
- transformed += normal * wave;
+if (uMotionEnabled > 0.001) {
+ if (uMotionType > 0.5 && uMotionType < 1.5) {
+  float beat = sin(uTime * 7.54);
+  float pulse = (pow(max(0.0, beat), 3.0) * 0.040 - pow(max(0.0, -beat), 2.0) * 0.015) * uMotionEnabled;
+  transformed += normal * pulse;
+ } else if (uMotionType > 1.5 && uMotionType < 2.5) {
+  float breath = sin(uTime * 1.45) * 0.022 * uMotionEnabled;
+  transformed.x += sign(transformed.x) * breath;
+  transformed.z += breath * 0.65;
+ } else if (uMotionType > 2.5 && uMotionType < 3.5) {
+  float wave = sin(transformed.y * 20.0 - uTime * 3.0) * 0.012 * uMotionEnabled;
+  transformed += normal * wave;
+ }
 }
 
 partVisible = state.w;
@@ -445,12 +449,27 @@ if (organGlow.a > 0.005) {
    const moving=Math.abs(amount-s.explode)>.0001;
    if(moving){amount=T.MathUtils.damp(amount,s.explode,8,dt);dirty=true;}
 
-   // Honest physiological animation runs in the vertex shader via uTime. Continuous
-   // redraw is gated to genuinely animated states; while idle the clock only refreshes
-   // on a ~4 Hz cadence (stepped idle motion) so we stop paying full renders per frame.
-   const animating=!!s.simulation?.active||glowActive||controls.autoRotate||interacting;
-   const elapsed=clock.getElapsedTime();
-   if(animating||elapsed-lastTimePush>=.25){timeUniform.value=elapsed;dirty=true;lastTimePush=elapsed;}
+   const targetMotion = s.motion !== false ? 1.0 : 0.0;
+   if (Math.abs(currentMotion - targetMotion) > 0.001) {
+    currentMotion = T.MathUtils.damp(currentMotion, targetMotion, 10, dt);
+    motionUniform.value = currentMotion;
+    dirty = true;
+   } else if (motionUniform.value !== targetMotion) {
+    currentMotion = targetMotion;
+    motionUniform.value = targetMotion;
+    dirty = true;
+   }
+
+   // Honest physiological animation runs in the vertex shader via uTime modulated by uMotionEnabled.
+   // Smooth 60fps redraw runs whenever motion is active, drug simulation is active, auto-rotating, or interacting.
+   const motionActive = (s.motion !== false) && currentMotion > 0.01;
+   const animating = !!s.simulation?.active || glowActive || controls.autoRotate || interacting || motionActive;
+   const elapsed = clock.getElapsedTime();
+   if (animating || elapsed - lastTimePush >= .25) {
+    timeUniform.value = elapsed;
+    dirty = true;
+    lastTimePush = elapsed;
+   }
 
    // On-demand chunk boosting for user selections and active simulation
    if (s.selected.length > 0) {

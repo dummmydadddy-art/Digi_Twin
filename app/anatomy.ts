@@ -211,6 +211,7 @@ export interface SceneState {
  isolate: boolean;
  view: View;
  rotate: boolean;
+ motion?: boolean;
  reset: number;
  patient?: PatientProfile;
  simulation?: SimulationVisualState;

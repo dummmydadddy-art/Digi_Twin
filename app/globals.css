@@ -1093,3 +1093,48 @@ h1 .edition{font-family:inherit;font-weight:500;font-size:10px;letter-spacing:.0
     padding: 20px 14px 28px !important;
   }
 }
+
+/* Physiological Organ Movement (Heartbeat, Respiration, Peristalsis) Animation & Button Styles */
+@keyframes heartPulseAnim {
+  0%, 100% { transform: scale(1); }
+  14% { transform: scale(1.22); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.15); }
+  70% { transform: scale(1); }
+}
+
+.motion-heart-pulse {
+  color: #e11d48;
+  animation: heartPulseAnim 1.4s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.view-controls .motion-btn.active {
+  background: #263b48;
+  color: #fff;
+  box-shadow: 0 2px 4px #18253610;
+}
+
+.view-controls .motion-btn.active .motion-heart-pulse {
+  color: #fb7185;
+}
+
+.top-actions .motion-trigger.active {
+  border-color: #f43f5e55;
+  background: #fff1f280;
+  color: #9f1239;
+}
+
+.top-actions .motion-trigger.active:hover {
+  background: #ffe4e6;
+}
+
+.top-actions .motion-trigger.paused {
+  opacity: 0.72;
+  color: #64748b;
+}
+
+.top-actions .motion-trigger.paused:hover {
+  opacity: 1;
+  background: #f1f5f9;
+}
