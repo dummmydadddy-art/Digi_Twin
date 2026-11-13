@@ -127,6 +127,15 @@ export default function Home(){
   [currentDrug, selectedDoseMg, patientPkParams]
  );
 
+ const contraindicatedDrugs = useMemo(
+  () => DRUGS.filter((d) => d.contraindicatedAllergy === patientPkParams.allergy),
+  [patientPkParams.allergy]
+ );
+
+ // Formulary awareness for the allergy picker: an allergy with no matching drug in
+ // the catalog is not a live risk, so the UI says so instead of implying one.
+ const hasFormularyMatch = (allergy: DrugAllergy) => DRUGS.some((d) => d.contraindicatedAllergy === allergy);
+
  const handleDrugChange = (id: DrugId) => {
   setSelectedDrugId(id);
   const drug = getDrugById(id) ?? DRUGS[0];
@@ -975,6 +984,7 @@ export default function Home(){
         onClick={() => updatePatient({ allergy: 'nsaids' })}
        >
         NSAIDs / Aspirin
+        {!hasFormularyMatch('nsaids') && <span className="pill-no-match">no formulary match</span>}
        </button>
        <button
         type="button"
@@ -982,6 +992,7 @@ export default function Home(){
         onClick={() => updatePatient({ allergy: 'penicillin' })}
        >
         Penicillins
+        {!hasFormularyMatch('penicillin') && <span className="pill-no-match">no formulary match</span>}
        </button>
        <button
         type="button"
@@ -989,6 +1000,7 @@ export default function Home(){
         onClick={() => updatePatient({ allergy: 'sulfonamides' })}
        >
         Sulfonamides
+        {!hasFormularyMatch('sulfonamides') && <span className="pill-no-match">no formulary match</span>}
        </button>
       </div>
       {patient.allergy !== 'none' && (
@@ -996,7 +1008,7 @@ export default function Home(){
         <span className="alert-icon">⚠</span>
         <div>
          <strong>Hypersensitivity Warning</strong>
-         <p>Documented allergy to {patient.allergy === 'nsaids' ? 'NSAIDs (Aspirin, Ibuprofen)' : patient.allergy}. The drug digestion engine will block contraindicated simulation runs.</p>
+         <p>Documented allergy to {patient.allergy === 'nsaids' ? 'NSAIDs (Aspirin, Ibuprofen)' : patient.allergy}. {contraindicatedDrugs.length > 0 ? `The drug digestion engine blocks simulation runs for: ${contraindicatedDrugs.map((d) => d.name).join(', ')}.` : 'No drug in the current formulary is contraindicated for this allergy, so simulation runs proceed.'}</p>
         </div>
        </div>
       )}

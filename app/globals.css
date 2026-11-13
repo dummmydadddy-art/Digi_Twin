@@ -246,6 +246,13 @@ h1 .edition{font-family:inherit;font-weight:500;font-size:10px;letter-spacing:.0
   border-color: #dc2626;
   color: #ffffff;
 }
+.patient-pill-btn .pill-no-match {
+  display: block;
+  margin-top: 1px;
+  font-size: 9.5px;
+  font-weight: 400;
+  opacity: 0.62;
+}
 .blood-group-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

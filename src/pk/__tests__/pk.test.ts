@@ -309,4 +309,22 @@ describe('Safety Module - Allergy Block & Dose Warnings', () => {
   assert.strictEqual(highDose.hasWarning, true);
   assert.ok(highDose.warningMessage?.includes('16.0 mg/kg'));
  });
+
+ it('runSimulation refuses contraindicated runs instead of simulating them', () => {
+  const penAllergic: PatientPkParams = { ...REFERENCE_PATIENT, allergy: 'penicillin' };
+  assert.throws(() => runSimulation({ drugId: 'amoxicillin', doseMg: 500, patient: penAllergic }), /Penicillin hypersensitivity/);
+
+  const nsaidAllergic: PatientPkParams = { ...REFERENCE_PATIENT, allergy: 'nsaids' };
+  assert.throws(() => runSimulation({ drugId: 'ibuprofen', doseMg: 400, patient: nsaidAllergic }), /NSAID/);
+  assert.throws(() => runSimulation({ drugId: 'aspirin', doseMg: 325, patient: nsaidAllergic }), /NSAID/);
+ });
+
+ it('runSimulation still completes for allowed drugs with an allergic patient', () => {
+  const result = runSimulation({
+   drugId: 'paracetamol',
+   doseMg: 500,
+   patient: { ...REFERENCE_PATIENT, allergy: 'penicillin' },
+  });
+  assert.ok(result.cmaxMgL > 0, 'Allowed drug must still produce a plasma peak for an allergic patient');
+ });
 });

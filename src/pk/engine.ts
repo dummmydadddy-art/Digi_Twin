@@ -128,6 +128,12 @@ export function runSimulation(config: SimulationConfig): SimulationResult {
  }
 
  const safety = checkDrugSafety(drug, config.doseMg, config.patient);
+ // Never simulate a contraindicated run: the engine refuses so that a safety
+ // bypass in any caller cannot produce plausible-looking kinetics for a drug
+ // the safety layer has blocked.
+ if (safety.isBlocked) {
+  throw new Error(safety.blockReason ?? `CONTRAINDICATION: ${drug.name} is blocked for this patient profile.`);
+ }
  const p = resolvePkParameters(drug, config.doseMg, config.patient);
 
  const duration = config.durationHours ?? 24.0;
