@@ -133,6 +133,7 @@ export default function AnatomyScene({atlas,state,onSelect,onPeelChange,onProgre
   let currentPeel=0,targetPeel=0,currentPeelRadius=0,targetPeelRadius=0;
   const currentPeelCenter=new T.Vector3(0,.88,0),targetPeelCenter=new T.Vector3(0,.88,0);
   let flyingTo:{target:T.Vector3;cameraPos:T.Vector3}|null=null;
+  let glowActive=false;
 
   const materialFor=(system:string)=>{
    const tier=getSystemTier(system as SystemId);
@@ -257,7 +258,7 @@ if (organGlow.a > 0.005) {
     if(p.chunk!==ci)return;
     const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(new Float32Array(buffer,p.positions,p.vertexCount*3),3));
     g.setAttribute('normal',new T.BufferAttribute(new Int16Array(buffer,p.normals,p.vertexCount*3),3,true));g.setIndex(new T.BufferAttribute(new Uint32Array(buffer,p.indices,p.indexCount),1));
-    g.boundingBox=bounds[i].clone();g.computeBoundingSphere();const pick=new T.Mesh(g);pick.matrixAutoUpdate=false;pick.visible=false;pickers[i]=pick;geometries.push(g);
+    g.boundingBox=bounds[i].clone();g.computeBoundingSphere();const pick=new T.Mesh(g);pick.matrixAutoUpdate=false;pick.visible=false;pickers[i]=pick;geometries.push(g);anatomyGroup.add(pick);
     g.setAttribute('partIndex',new T.BufferAttribute(new Float32Array(p.vertexCount).fill(i),1));
     const list=groups.get(p.system)??[];list.push(g);groups.set(p.system,list);
    });
@@ -433,7 +434,9 @@ if (organGlow.a > 0.005) {
    dirty=true;
   };
 
+  const onPointerLeave=()=>{hover.hidden=true;};
   renderer.domElement.addEventListener('pointerdown',down);renderer.domElement.addEventListener('pointermove',move);renderer.domElement.addEventListener('pointerup',up);renderer.domElement.addEventListener('pointercancel',cancel);
+  renderer.domElement.addEventListener('pointerleave',onPointerLeave);
   renderer.domElement.addEventListener('wheel',onWheel,{passive:false});
   const clock=new T.Clock();let lastExtent=-1;
   const animate=()=>{
@@ -559,6 +562,7 @@ if (organGlow.a > 0.005) {
      glowData[i * 4 + 3] = a;
     });
     glowTexture.needsUpdate = true;
+    glowActive = true;
     dirty = true;
    } else {
     if (pillGroup.visible) pillGroup.visible = false;
@@ -572,9 +576,10 @@ if (organGlow.a > 0.005) {
      }
      instancedParticles.instanceMatrix.needsUpdate = true;
     }
-    if (glowData[0] !== 0 || glowData[1] !== 0) {
+    if (glowActive) {
      glowData.fill(0);
      glowTexture.needsUpdate = true;
+     glowActive = false;
      dirty = true;
     }
    }
@@ -659,7 +664,7 @@ if (organGlow.a > 0.005) {
 
   };animate();
   const contextLost=(e:Event)=>{e.preventDefault();onError('The 3D session was paused by your device. Reload to continue.');};renderer.domElement.addEventListener('webglcontextlost',contextLost);
-  return()=>{disposed=true;abort.abort();cancelAnimationFrame(frame);observer.disconnect();controls.dispose();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());scene.traverse(o=>{if(o instanceof T.Mesh&&!geometries.includes(o.geometry)){o.geometry.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose());}});env.dispose();partTexture.dispose();selectionTexture.dispose();glowTexture.dispose();markerGeometry.dispose();markerMaterial.dispose();hover.remove();renderer.domElement.removeEventListener('wheel',onWheel);renderer.dispose();renderer.domElement.remove();};
+  return()=>{disposed=true;abort.abort();cancelAnimationFrame(frame);observer.disconnect();controls.dispose();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());scene.traverse(o=>{if(o instanceof T.Mesh&&!geometries.includes(o.geometry)){o.geometry.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose());}});env.dispose();partTexture.dispose();selectionTexture.dispose();glowTexture.dispose();markerGeometry.dispose();markerMaterial.dispose();hover.remove();renderer.domElement.removeEventListener('pointerdown',down);renderer.domElement.removeEventListener('pointermove',move);renderer.domElement.removeEventListener('pointerup',up);renderer.domElement.removeEventListener('pointercancel',cancel);renderer.domElement.removeEventListener('pointerleave',onPointerLeave);renderer.domElement.removeEventListener('wheel',onWheel);renderer.domElement.removeEventListener('webglcontextlost',contextLost);renderer.dispose();renderer.domElement.remove();};
  },[atlas]);
  return <div className="scene" ref={host}/>;
 }

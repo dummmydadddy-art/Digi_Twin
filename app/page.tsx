@@ -46,7 +46,7 @@ export default function Home(){
 
  const reset=()=>{
   setState(s=>({...initial,cutaway:true,visible:DEFAULT_VISIBLE,patient:s.patient,simulation:{active:false,progress:0,stomachLevel:0,gutLevel:0,plasmaLevel:0,liverIntensity:0,kidneyIntensity:0,hepaticRateMgH:0,renalRateMgH:0,stomachMg:0,gutMg:0,plasmaMg:0},reset:s.reset+1}));
-  setChosen(null);setDetails(false);setPanel(null);setPatientOpen(false);setSimRunning(false);setSimPaused(false);setSimTimeHours(0);setSimResult(null);
+  setChosen(null);setDetails(false);setPanel(null);setPatientOpen(false);setSimPanelOpen(false);setAbout(false);setSimRunning(false);setSimPaused(false);setSimTimeHours(0);setSimResult(null);
  };
 
  useEffect(()=>{
@@ -56,8 +56,11 @@ export default function Home(){
     reset();
    }else if(e.key==='/'&&!(e.target instanceof HTMLInputElement)&&!(e.target instanceof HTMLTextAreaElement)){
     e.preventDefault();
-    setPanel('search');
     setDetails(false);
+    setSimPanelOpen(false);
+    setPatientOpen(false);
+    setAbout(false);
+    setPanel('search');
    }
   };
   window.addEventListener('keydown',key);
@@ -91,7 +94,7 @@ export default function Home(){
   const tier=firstPart?getSystemTier(firstPart.system):3;
   const organPeel=tier===3?.78:tier===2?.54:tier===1?.26:0;
   setState(s=>({...s,selected:c.elements,peel:Math.max(s.peel??0,organPeel),cutaway:true,isolate:false,rotate:false}));
-  setDetails(true);setPanel(null);
+  setDetails(true);setPanel(null);setSimPanelOpen(false);setPatientOpen(false);setAbout(false);
  };
 
  useEffect(()=>{if(!atlas)return;return registerAtlasTools(atlas,c=>flushSync(()=>choose(c)));},[atlas]);
@@ -102,11 +105,11 @@ export default function Home(){
   const tier=getSystemTier(p.system);
   const organPeel=tier===3?.78:tier===2?.54:tier===1?.26:0;
   setState(s=>({...s,selected:[id],peel:Math.max(s.peel??0,organPeel),cutaway:true,isolate:false,rotate:false}));
-  setDetails(true);setPanel(null);
+  setDetails(true);setPanel(null);setSimPanelOpen(false);setPatientOpen(false);setAbout(false);
  };
 
  const toggle=(id:SystemId)=>{setDetails(false);setState(s=>({...s,selected:[],isolate:false,visible:s.visible.includes(id)?s.visible.filter(x=>x!==id):[...s.visible,id]}));};
- const openPanel=(next:'layers'|'search')=>{setDetails(false);setPanel(p=>p===next?null:next);};
+ const openPanel=(next:'layers'|'search')=>{setDetails(false);setSimPanelOpen(false);setPatientOpen(false);setAbout(false);setPanel(p=>p===next?null:next);};
 
  const currentDrug = useMemo<DrugDefinition>(() => getDrugById(selectedDrugId) ?? DRUGS[0], [selectedDrugId]);
 
@@ -491,7 +494,7 @@ export default function Home(){
    <Button
     variant="ghost"
     className={`patient-trigger ${patientOpen ? 'active' : ''}`}
-    onClick={() => { setDetails(false); setPanel(null); setAbout(false); setPatientOpen(o => !o); }}
+    onClick={() => { setDetails(false); setPanel(null); setAbout(false); setSimPanelOpen(false); setPatientOpen(o => !o); }}
     aria-label="Open Patient Profile"
     title="Configure patient attributes & body scaling"
    >
@@ -752,7 +755,7 @@ export default function Home(){
   )}
 
   {panel==='search'&&<section className="search-panel glass" aria-label="Find anatomy"><div className="panel-heading"><span>Find a structure</span><Button variant="ghost" className="icon-button" onClick={()=>setPanel(null)} aria-label="Close search"><X size={18}/></Button></div><Combobox<Concept> items={results} value={null} onValueChange={value=>{if(value)choose(value);}} inputValue={query} onInputValueChange={setQuery} itemToStringLabel={c=>c.name} filter={null} open onOpenChange={open=>{if(!open)setPanel(null);}}><ComboboxInput autoFocus placeholder="Heart, femur, cranial nerve…" aria-label="Search named anatomical structures" showTrigger={false}/><ComboboxContent className="anatomy-search-results"><ComboboxEmpty>No structures match your search.</ComboboxEmpty><ComboboxList>{(c:Concept)=><ComboboxItem key={c.id} value={c}><span className="search-result-name">{c.name}</span><span className="small-number">{c.elements.length} {c.elements.length===1?'piece':'pieces'}</span></ComboboxItem>}</ComboboxList></ComboboxContent></Combobox><p className="search-note">{query?'Showing up to 80 matches. Refine your search to find smaller structures.':'Start with a major organ, or search every named structure.'}</p></section>}
-  <nav className="view-controls glass" aria-label="Camera controls">{(['three-quarter','front','side','back'] as View[]).map((v,i)=><Button variant="ghost" key={v} className={state.view===v?'active':''} aria-pressed={state.view===v} disabled={state.explode>.8&&v!=='front'} onClick={()=>setState(s=>({...s,view:v,reset:s.reset+1,rotate:false}))} title={`${v} view`} aria-label={`${v} view`}><span>{['¾','F','S','B'][i]}</span></Button>)}<i/><Button variant="ghost" disabled={state.explode>=.4} aria-label={state.rotate?'Pause rotation':'Rotate body'} title="Auto rotate" className={state.rotate?'active':''} onClick={()=>setState(s=>({...s,rotate:!s.rotate}))}>{state.rotate?<Pause size={17}/>:<RotateCw size={18}/>}</Button><Button variant="ghost" aria-label="Reset view and layers" title="Reset (Esc)" onClick={reset}><RotateCcw size={17}/></Button></nav>
+  <nav className="view-controls glass" aria-label="Camera controls">{(['three-quarter','front','side','back'] as View[]).map((v,i)=><Button variant="ghost" key={v} className={state.view===v?'active':''} aria-pressed={state.view===v} disabled={state.explode>.8&&v!=='front'} onClick={()=>setState(s=>({...s,view:v,rotate:false}))} title={`${v} view`} aria-label={`${v} view`}><span>{['¾','F','S','B'][i]}</span></Button>)}<i/><Button variant="ghost" disabled={state.explode>=.4} aria-label={state.rotate?'Pause rotation':'Rotate body'} title="Auto rotate" className={state.rotate?'active':''} onClick={()=>setState(s=>({...s,rotate:!s.rotate}))}>{state.rotate?<Pause size={17}/>:<RotateCw size={18}/>}</Button><Button variant="ghost" aria-label="Reset view and layers" title="Reset (Esc)" onClick={reset}><RotateCcw size={17}/></Button></nav>
   <div className="scene-caption"><span className="caption-line"/><span>{state.isolate?(chosen?.name??'SELECTED STRUCTURE'):state.explode>.95?'ANATOMICAL INVENTORY':state.explode>.05?'SEPARATED STRUCTURES':(state.peel??0)>.05?`PEEL: ${getPeelTierLabel(state.peel).toUpperCase()} LAYER`:`${patient.age}YO ${patient.sex.toUpperCase()} · ${patient.heightCm}CM · ${patient.weightKg}KG · APPROXIMATION`}</span><span className="caption-line"/></div>
   <div className="bottom-dock glass">
    <Button variant="ghost" className="mobile-only dock-layers" onClick={()=>openPanel('layers')} aria-label="Open system layers"><Layers3 size={20}/><span>Systems</span></Button>
